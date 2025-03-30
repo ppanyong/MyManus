@@ -1,0 +1,21 @@
+# LLM配置
+[llm]
+api_key = ""  # 需要填入实际的API密钥
+model = "gpt-4"
+temperature = 0.7
+max_tokens = 2000
+
+# 超时设置
+[timeout]
+default = 30  # 默认超时时间（秒）
+long_running = 300  # 长时间运行任务的超时时间
+
+# Google搜索配置
+[google]
+api_key = ""  # 需要填入实际的Google API密钥
+search_engine_id = ""  # 需要填入实际的搜索引擎ID
+
+# 系统配置
+[system]
+debug = false
+log_level = "INFO" 
