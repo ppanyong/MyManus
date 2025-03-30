@@ -29,3 +29,48 @@ class GoogleSearchTool:
                 "results": [],
                 "error": str(e)
             } 
+    
+    def get_tool_description(self) -> Dict[str, Any]:
+        """返回工具描述，符合MCP协议"""
+        return {
+            "name": "google_search",
+            "description": "Google搜索工具,可以执行网络搜索并返回结果",
+            "functions": [
+                {
+                    "name": "search",
+                    "description": "执行Google搜索查询",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "搜索关键词"
+                            },
+                            "max_results": {
+                                "type": "integer",
+                                "description": "最大返回结果数量",
+                                "default": 5
+                            }
+                        },
+                        "required": ["query"]
+                    },
+                    "returns": {
+                        "type": "object",
+                        "properties": {
+                            "status": {
+                                "type": "string",
+                                "enum": ["success", "error"]
+                            },
+                            "results": {
+                                "type": "array",
+                                "description": "搜索结果列表"
+                            },
+                            "error": {
+                                "type": "string",
+                                "description": "错误信息"
+                            }
+                        }
+                    }
+                }
+            ]
+        }

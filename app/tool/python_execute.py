@@ -34,3 +34,42 @@ class PythonExecuteTool:
                 "output": None,
                 "error": str(e)
             } 
+    
+    def get_tool_description(self) -> Dict[str, Any]:
+        """返回工具描述，符合MCP协议"""
+        return {
+            "name": "python_execute",
+            "description": "Python代码执行工具,可以执行Python代码并返回结果",
+            "functions": [
+                {
+                    "name": "execute",
+                    "description": "执行Python代码",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "code": {
+                                "type": "string",
+                                "description": "要执行的Python代码"
+                            }
+                        },
+                        "required": ["code"]
+                    },
+                    "returns": {
+                        "type": "object",
+                        "properties": {
+                            "status": {
+                                "type": "string",
+                                "enum": ["success", "error"]
+                            },
+                            "output": {
+                                "type": "string",
+                                "description": "代码执行的输出结果"
+                            },
+                            "error": {
+                                "type": "string", 
+                                "description": "错误信息"
+                            }
+                        }
+                    }
+                }
+            ]}

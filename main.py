@@ -4,6 +4,7 @@ from app.agent.manus import ManusAgent
 from app.tool.python_execute import PythonExecuteTool
 from app.tool.google_search import GoogleSearchTool
 from app.ui import UI
+from app.tool.calculator import CalculatorTool
 
 def load_config():
     """加载配置文件"""
@@ -22,15 +23,16 @@ def main():
     # 添加工具
     agent.add_tool(PythonExecuteTool(config))
     agent.add_tool(GoogleSearchTool(config))
-    
+    # 添加计算器工具
+    agent.add_tool(CalculatorTool(config))
+
     # 初始化智能体
     agent.initialize()
     
     # 启动UI界面
     ui = UI(agent)
     ui.run()
-    # TODO: 实现命令行交互逻辑
-    print("MyManus AI Assistant is ready!")
+   
 
 if __name__ == "__main__":
     main()
