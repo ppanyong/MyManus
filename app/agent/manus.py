@@ -3,6 +3,7 @@ import os
 from jinja2 import Template
 from .base import ToolCallAgent
 from ..flow.planning import PlanningFlow
+from .react import ReactAgent
 
 class ManusAgent(ToolCallAgent):
     """主智能体实现"""
@@ -19,102 +20,69 @@ class ManusAgent(ToolCallAgent):
         pass
         
     def execute(self, task: str) -> Dict[str, Any]:
-        """执行任务，使用模板处理"""
+        """执行任务"""
         try:
-            # 1. 生成任务计划
-            plan = self._generate_task_plan(task)
-            if not plan.get("status") == "success":
-                return {
-                    "logs": plan
-                }
-            
-            # 2. 解析计划步骤（最多20步）
-            steps = self._parse_steps(plan.get("result", ""))
+            # 生成执行计划
+            response = self.planning_flow.execute(task)
+            if response.get("status") == "error":
+                return response
+                
+            steps = response.get("tasks", [])
             if not steps:
                 return {
-                    "logs": {
-                        "status": "error",
-                        "result": None,
-                        "error": "无法生成有效的任务计划"
-                    }
+                    "status": "error",
+                    "error": "未生成有效的执行步骤"
                 }
-            
-            # 3. 返回计划和初始状态
-            response = {
-                "status": "success",
-                "result": "任务计划已生成，开始执行",
-                "tasks": [{"description": step, "completed": False} for step in steps],
-                "logs": [{
-                    "type": "info",
-                    "message": "任务计划已生成，共 {} 个步骤".format(len(steps))
-                }]
-            }
-            
-            # 4. 逐步执行计划
+            # 将执行步骤写入任务记录
+            task_steps = []
             for i, step in enumerate(steps):
-                try:
-                    # 将当前步骤对应的工具添加到规划流程中
-                    # 注意:这里假设tools列表中的工具顺序与步骤顺序一致
-                    self.planning_flow.add_tools(self.tools)
-                    # 执行单个步骤
-                    step_result = self.planning_flow.execute(step)
-                    # 将单步执行结果回填到上下文中
-                    if step_result.get("status") == "success":
-                        # 更新当前步骤的执行结果
-                        response["tasks"][i].update({
-                            "result": step_result.get("result"),
-                            "task_info": step_result.get("task_info")
-                        })
-                        
-                        # 将结果添加到上下文
-                        self.add_memory({
-                            "type": "step_result",
-                            "step": i + 1,
-                            "task": step,
-                            "result": step_result.get("result"),
-                            "task_info": step_result.get("task_info")
-                        })
-                    # 更新任务状态
-                    response["tasks"][i]["completed"] = (step_result.get("status") == "success")
-                    
-                    # 存储执行结果
-                    self.memory.append({
-                        "step": i + 1,
-                        "task": step,
-                        "result": step_result
-                    })
-                    
-                    # 添加执行日志
-                    response["logs"].append({
-                        "type": "step",
-                        "message": f"步骤 {i+1}: {step}",
-                        "status": step_result.get("status"),
-                        "result": step_result.get("result")
-                    })
-                    
-                    # 更新当前任务
-                    response["current_task"] = step
-                    
-
-                except Exception as e:
-                    response["logs"].append({
-                        "type": "error",
-                        "message": f"步骤 {i+1} 执行失败: {str(e)}"
-                    })
+                task_steps.append({
+                    "step_id": i + 1,
+                    "description": step["task"],
+                    "status": "pending"
+                })
+                
+            response["task_steps"] = task_steps
+                
+            # 创建ReactAgent链
+            prev_agent = None
+            first_agent = None
             
-            #将最终结果通过对话的方式反馈给用户
-            print(response)
+            # 为每个步骤创建ReactAgent实例
+            for i, step in enumerate(steps):
+                current_agent = ReactAgent(
+                    task=step["task"],
+                    tools=self.tools,
+                    step_index=i+1,
+                    memory=self.memory
+                )
+                
+                if prev_agent:
+                    prev_agent.set_next_agent(current_agent)
+                else:
+                    first_agent = current_agent
+                    
+                prev_agent = current_agent
+                
+            # 执行整个链条
+            if first_agent:
+                chain_result = first_agent.execute_chain()
+                
+                # 更新响应信息
+                response.update({
+                    "status": chain_result.get("status"),
+                    "final_result": chain_result.get("result"),
+                    "memory": self.memory
+                })
+                
             return response
             
         except Exception as e:
             error_msg = f"处理任务失败: {str(e)}"
             print(error_msg)
             return {
-                "logs": {
-                    "status": "error",
-                    "result": None,
-                    "error": error_msg
-                }
+                "status": "error",
+                "error": error_msg
             }
     
     def _generate_task_plan(self, task: str) -> Dict[str, Any]:

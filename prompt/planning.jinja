@@ -20,8 +20,54 @@
 - 包含每个步骤的详细说明
 - 标注关键依赖关系
 
-当前任务：{{ task }}
-上下文信息：{{ context }}
-可用资源：{{ resources }}
+用户任务: {{ task }}
 
-请生成详细的任务执行计划。 
+请将这个任务分解为具体的执行步骤，每个步骤需要包含以下信息：
+1. 步骤编号
+2. 目的和意图：这个步骤想要达到什么目标
+3. 详细说明：具体需要执行什么操作
+4. 所需参数：执行这个步骤需要什么参数
+5. 依赖步骤：依赖哪些之前步骤的结果
+6. 预期输出：这个步骤预期会产生什么结果
+
+请返回JSON格式的规划结果：
+{
+    "steps": [
+        {
+            "step_id": 1,
+            "purpose": "计算两个数字的和",
+            "description": "使用Calculator.add执行计算1+1",
+            "parameters": {
+                "a": 1,
+                "b": 1
+            },
+            "dependencies": [],
+            "expected_output": "计算结果（数字类型）"
+        },
+        {
+            "step_id": 2,
+            "purpose": "将计算结果保存到文件",
+            "description": "使用FileManager.write执行将结果写入到文件",
+            "parameters": {
+                "filename": "result.txt",
+                "content": "{step_1_result}"
+            },
+            "dependencies": ["step_1"],
+            "expected_output": "文件写入成功的确认信息"
+        }
+    ]
+}
+
+要求：
+1. 步骤数量不要超过 {{ max_steps }} 个
+2. 每个步骤都必须包含上述所有字段
+3. 如果步骤依赖之前步骤的结果，在parameters中使用 {step_X_result} 格式引用
+4. description 必须使用"使用{工具名}.{方法名}执行{具体任务}"的格式
+5. purpose 要清晰说明该步骤的目标
+6. expected_output 要说明预期的输出格式或类型
+
+注意：
+1. 确保步骤之间的依赖关系正确
+2. 参数要明确具体
+3. 每个步骤的目的要清晰
+4. 预期输出要具体且可验证
