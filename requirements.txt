@@ -1,0 +1,11 @@
+toml==0.10.2
+python-dotenv==1.0.0
+requests==2.31.0
+google-api-python-client==2.108.0
+google-auth-httplib2==0.1.1
+google-auth-oauthlib==1.1.0
+flask-socketio==5.3.6
+flask[async]==3.0.2
+json_repair
+bs4
+hypercorn==0.15.0

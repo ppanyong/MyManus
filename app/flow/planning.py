@@ -3,6 +3,8 @@ import os
 import re
 from jinja2 import Template
 from .base import BaseFlow
+import requests
+import time
 
 class PlanningFlow(BaseFlow):
     """规划流程实现"""
@@ -54,72 +56,113 @@ class PlanningFlow(BaseFlow):
         for tool in tools:
             self.add_tool(tool)
         
-    def execute(self, task: str) -> Dict[str, Any]:
-        """执行规划流程，使用大模型解析并调用合适的工具"""
-        if not self._initialized_tools:
-            return {
-                "status": "error",
-                "result": None,
-                "error": "工具未初始化，请先添加工具"
+    def execute(self, prompt: str, tools: List[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """执行规划流程
+        Args:
+            prompt: 提示词
+            tools: 可选，工具列表，格式为:
+                [
+                    {
+                        "function": {
+                            "strict": False,
+                            "name": "工具名称",
+                            "description": "工具描述"
+                        },
+                        "type": "function"
+                    }
+                ]
+        """
+        try:
+            # 从配置中获取 API 设置
+            api_config = self.config.get('api', {})
+            
+            headers = {
+                "Authorization": f"Bearer {api_config.get('api_key')}",
+                "Content-Type": "application/json"
             }
             
-        print(f"执行规划流程: {task}")
-        try:
-            # 1. 获取所有工具的描述信息
-            tool_descriptions = self._get_all_tool_descriptions()
-            
-            # 2. 使用大模型解析任务，匹配工具
-            tool_call = self._parse_task_with_llm(task, tool_descriptions)
-            if not tool_call:
-                return {
-                    "status": "error",
-                    "result": None,
-                    "error": "无法理解任务或找到合适的工具"
-                }
-                
-            tool_name, function_name, params = tool_call
-            
-            # 3. 查找并执行工具
-            tool = self._find_tool(tool_name)
-            if not tool:
-                return {
-                    "status": "error",
-                    "result": None,
-                    "error": f"找不到工具: {tool_name}"
-                }
-            
-            try:
-                func = getattr(tool, function_name)
-                result = func(**params)
-                
-                return {
-                    "status": "success",
-                    "result": result,
-                    "error": None,
-                    "task_info": {
-                        "tool": tool_name,
-                        "function": function_name,
-                        "params": params
+            # 构建请求体
+            request_body = {
+                "model": api_config.get('model'),
+                "prompt": prompt,
+                "stream": api_config.get('stream', False),
+                "options": {
+                    "temperature": api_config.get('temperature', 0.7),
+                    "max_tokens": api_config.get('max_tokens', 4096)
+                },
+                "messages": [
+                    {
+                        "content": prompt,
+                        "role": "user"
                     }
-                }
-                
-            except Exception as e:
-                return {
-                    "status": "error",
-                    "result": None,
-                    "error": f"执行失败: {str(e)}",
-                    "task_info": {
-                        "tool": tool_name,
-                        "function": function_name,
-                        "params": params
+                ]
+            }
+            
+            # 如果提供了 tools，添加到请求体中
+            if tools:
+                request_body["tools"] = tools
+            
+            # 添加重试机制
+            max_retries = 3
+            retry_delay = 2  # 秒
+            
+            for attempt in range(max_retries):
+                try:
+                    response = requests.post(
+                        api_config.get('url'),
+                        headers=headers,
+                        json=request_body,
+                        timeout=30  # 添加超时设置
+                    )
+                    
+                    if response.status_code == 200:
+                        return {
+                            "status": "success",
+                            "result": response.json()
+                        }
+                    else:
+                        print(f"API请求失败 (尝试 {attempt + 1}/{max_retries}): {response.status_code}")
+                        if attempt < max_retries - 1:
+                            time.sleep(retry_delay)
+                            continue
+                        return {
+                            "status": "error",
+                            "error": f"API请求失败: {response.status_code}"
+                        }
+                        
+                except requests.exceptions.ConnectionError as e:
+                    print(f"连接错误 (尝试 {attempt + 1}/{max_retries}): {str(e)}")
+                    if attempt < max_retries - 1:
+                        print(f"等待 {retry_delay} 秒后重试...")
+                        time.sleep(retry_delay)
+                        continue
+                    return {
+                        "status": "error",
+                        "error": f"无法连接到API服务: {str(e)}"
                     }
-                }
-                
+                except requests.exceptions.Timeout:
+                    print(f"请求超时 (尝试 {attempt + 1}/{max_retries})")
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay)
+                        continue
+                    return {
+                        "status": "error",
+                        "error": "API请求超时"
+                    }
+                except Exception as e:
+                    print(f"请求异常 (尝试 {attempt + 1}/{max_retries}): {str(e)}")
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay)
+                        continue
+                    return {
+                        "status": "error",
+                        "error": f"API请求异常: {str(e)}"
+                    }
+                    
         except Exception as e:
             return {
                 "status": "error",
-                "result": None,
-                "error": f"规划流程失败: {str(e)}"
+                "error": str(e)
             }
     
     def _parse_task_with_llm(self, task: str, tool_descriptions: List[Dict]) -> Optional[Tuple[str, str, dict]]:
@@ -133,7 +176,7 @@ class PlanningFlow(BaseFlow):
             prompt = self.tool_prompt_template.render(**context)
             
             # 调用大模型获取响应
-            response = self._call_llm(prompt)
+            response = super().execute(prompt)
             
             # 解析大模型的响应
             # 预期响应格式：

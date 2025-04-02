@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MyManus AI Assistant</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
         body {
             font-family: 'Microsoft YaHei', sans-serif;
@@ -144,6 +145,23 @@
             0%, 80%, 100% { transform: scale(0); }
             40% { transform: scale(1); }
         }
+        .task-list {
+            margin: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .task-item {
+            padding: 10px;
+            margin: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .task-completed {
+            background-color: #e8f5e9;
+        }
+        .task-pending {
+            background-color: #fff3e0;
+        }
     </style>
 </head>
 <body>
@@ -183,12 +201,20 @@
         </div>
     </template>
 
+    <div class="task-list" id="taskList">
+        <h2>任务列表</h2>
+        <div id="tasks"></div>
+    </div>
+
     <script>
         const chatContainer = document.getElementById('chatContainer');
         const taskContainer = document.getElementById('taskContainer');
         const logContainer = document.getElementById('logContainer');
         const userInput = document.getElementById('userInput');
         const status = document.getElementById('status');
+
+        // 连接到 Socket.IO
+        const socket = io('/manus');
 
         async function checkStatus() {
             try {
@@ -320,6 +346,35 @@
             if (e.key === 'Enter') {
                 sendMessage();
             }
+        });
+
+        // 监听任务列表更新事件
+        socket.on('update_tasks', function(data) {
+            const tasksDiv = document.getElementById('tasks');
+            tasksDiv.innerHTML = ''; // 清空现有任务
+
+            data.tasks.forEach(task => {
+                const taskElement = document.createElement('div');
+                taskElement.className = `task-item ${task.completed ? 'task-completed' : 'task-pending'}`;
+                
+                const taskContent = `
+                    <div class="task-description">${task.description}</div>
+                    ${task.result ? `<div class="task-result">${task.result}</div>` : ''}
+                    <div class="task-status">${task.completed ? '已完成' : '进行中'}</div>
+                `;
+                
+                taskElement.innerHTML = taskContent;
+                tasksDiv.appendChild(taskElement);
+            });
+        });
+
+        // 连接状态处理
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server');
         });
 
         // 初始化
