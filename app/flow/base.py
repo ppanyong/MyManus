@@ -17,9 +17,74 @@ class BaseFlow(ABC):
         pass
         
     @abstractmethod
-    def execute(self) -> Dict[str, Any]:
-        """执行流程"""
-        pass
+    def execute(self, prompt: str, tools: List[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """执行流程
+        Args:
+            prompt: 提示词
+            tools: 可选，工具列表，格式为:
+                [
+                    {
+                        "function": {
+                            "strict": False,
+                            "name": "工具名称",
+                            "description": "工具描述"
+                        },
+                        "type": "function"
+                    }
+                ]
+        """
+        try:
+            # 从配置中获取 API 设置
+            api_config = self.config.get('api', {})
+            
+            headers = {
+                "Authorization": f"Bearer {api_config.get('api_key')}",
+                "Content-Type": "application/json"
+            }
+            
+            # 构建请求体
+            request_body = {
+                "model": api_config.get('model'),
+                "prompt": prompt,
+                "stream": api_config.get('stream', False),
+                "options": {
+                    "temperature": api_config.get('temperature', 0.7),
+                    "max_tokens": api_config.get('max_tokens', 4096)
+                },
+                "messages": [
+                    {
+                        "content": prompt,
+                        "role": "user"
+                    }
+                ]
+            }
+            
+            # 如果提供了 tools，添加到请求体中
+            if tools:
+                request_body["tools"] = tools
+            
+            response = requests.post(
+                api_config.get('url'),
+                headers=headers,
+                json=request_body
+            )
+            
+            if response.status_code == 200:
+                return {
+                    "status": "success",
+                    "result": response.json()
+                }
+            else:
+                return {
+                    "status": "error",
+                    "error": f"API请求失败: {response.status_code}"
+                }
+                
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e)
+            }
         
     def add_step(self, step: Dict[str, Any]):
         """添加流程步骤"""
