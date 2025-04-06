@@ -1,0 +1,1 @@
+from tools import FileManager; FileManager.write('result.txt', '{step_1_result}')

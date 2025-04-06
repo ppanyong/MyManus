@@ -7,7 +7,7 @@ from typing import Dict, Any
 from app.agent.manus import ManusAgent
 
 class UI:
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any],agent:ManusAgent):
         self.config = config
         self.app = Flask(__name__, 
                         static_folder='static',
@@ -15,7 +15,8 @@ class UI:
         self.socketio = SocketIO(self.app, 
                                async_mode='threading', 
                                cors_allowed_origins="*")
-        self.agent = ManusAgent(config, self.socketio)
+        self.agent=agent
+        self.agent.socketio=self.socketio
         self._setup_routes()
         self._setup_socket_events()
         
@@ -62,6 +63,9 @@ class UI:
                 'tools_count': len(self.agent.get_tools()) if self.agent else 0
             })
             
+       
+            
+    def _setup_socket_events(self):
         @self.socketio.on('connect', namespace='/manus')
         def handle_connect():
             print("Client connected")
@@ -69,10 +73,55 @@ class UI:
         @self.socketio.on('disconnect', namespace='/manus')
         def handle_disconnect():
             print("Client disconnected")
+
+        @self.socketio.on(' ', namespace='/manus')
+        def handle_update_plan(data):
+            """处理计划更新事件
             
-    def _setup_socket_events(self):
-        # This method is empty as the original setup_socket_events method is now part of the __init__ method
-        pass
+            Args:
+                data: 包含计划数据的字典，data的结构是 {[{'step_id': 1, 'purpose': '计算两个数字的和', 'description': '使用Calculator.add执行计算1+1', 'parameters': {'a': 1, 'b': 1}, 'dependencies': [], 'expected_output': '计算结果（数字类型）'}]}
+            """
+            try:
+                plan = data
+                if not plan:
+                    print("警告: 收到的计划为空")
+                    return
+                    
+                # 更新任务列表
+                tasks = [{"description": step, "completed": False} for step in plan]
+                
+                # 发送更新后的任务列表到客户端
+                self.socketio.emit('update_plan_ui', {
+                    'tasks': tasks
+                }, namespace='/manus')
+                
+                print(f"计划已更新，共 {len(plan)} 个步骤")
+                
+            except Exception as e:
+                print(f"处理计划更新失败: {str(e)}")
+                
+        @self.socketio.on('append_system_message', namespace='/manus')
+        def handle_append_system_message(data):
+            """处理系统消息追加事件
+            
+            Args:
+                data: 包含系统消息的字典，data的结构是 {'message': '系统消息内容'}
+            """
+            try:
+                message = data.get('message', '')
+                if not message:
+                    print("警告: 收到的系统消息为空")
+                    return
+                    
+                # 发送系统消息到客户端
+                self.socketio.emit('append_system_message_ui', {
+                    'message': message
+                }, namespace='/manus')
+                
+                print(f"系统消息已追加: {message[:50]}...")
+                
+            except Exception as e:
+                print(f"处理系统消息追加失败: {str(e)}")
 
     def run(self):
         """运行UI服务器"""

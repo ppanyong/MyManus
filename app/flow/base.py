@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 import requests
 from json_repair import repair_json
 import json
+import re
 
 class BaseFlow(ABC):
     """基础流程框架"""
@@ -116,47 +117,73 @@ class BaseFlow(ABC):
                 "error": "JSON解析失败"
             }
     
-    def _call_llm(self, prompt: str) -> Dict[str, Any]:
-        """调用大语言模型"""
-        try:
-            # 调用本地Ollama服务
-            print(f"发送提示词到LLM: {prompt}")
-            response = requests.post(
-                "http://localhost:11434/api/generate",
-                json={
-                    "model": "qwen2.5-coder:14b",
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.0,
-                        "max_tokens": 4096
-                    }
-                }
-            )
+    def _parse_steps(self, response: Dict[str, Any]) -> List[str]:
+        """解析API响应，提取步骤列表
+        
+        Args:
+            response: API响应数据
             
-            if response.status_code == 200:
-                result = response.json()
-                response_text = result.get("response", "")
-                print(f"LLM响应: {response_text}")
-                
-                # 解析响应文本中的JSON
-                parsed_response = self._parse_llm_response(response_text)
-                return parsed_response
-                
+        Returns:
+            List[str]: 解析后的步骤列表
+        """
+        try:
+            # 从 API 响应中提取文本内容
+            if isinstance(response, dict):
+                # 尝试从不同的响应格式中提取文本
+                text = response.get('response', '')  # 对于 Ollama 格式
+                if not text:
+                    text = response.get('choices', [{}])[0].get('message', {}).get('content', '')  # 对于 OpenAI 格式
+                if not text:
+                    text = response.get('result', '')  # 对于其他格式
             else:
-                error_msg = f"调用模型失败: {response.status_code}"
-                print(error_msg)
-                return {
-                    "status": "error",
-                    "result": None,
-                    "error": error_msg
-                }
-                
+                text = str(response)
+            
+            # 使用正则表达式匹配 JSON 部分
+            # 匹配 ```json 和 ``` 之间的内容
+            json_pattern = r'```json\s*([\s\S]*?)\s*```'
+            json_match = re.search(json_pattern, text)
+            
+            if json_match:
+                json_str = json_match.group(1).strip()
+                # 解析 JSON 字符串
+                json_data = json.loads(json_str)
+                # 获取步骤列表
+                steps = json_data.get("steps", [])
+                return str(steps)
+            else:
+                # 如果没有找到 JSON 结构，则使用原来的方法解析
+                steps = [step.strip() for step in text.split('\n') 
+                        if step.strip() and not step.startswith('#')]
+                return steps[:20]
+            
         except Exception as e:
-            error_msg = f"调用LLM出错: {str(e)}"
-            print(error_msg)
-            return {
-                "status": "error",
-                "result": None,
-                "error": error_msg
-            } 
+            print(f"解析步骤失败: {str(e)}")
+            return []
+    
+    def format_tools(self, tools: List[Any]) -> List[Dict[str, Any]]:
+        """格式化工具列表为统一格式
+        
+        Args:
+            tools: 工具列表，每个工具对象应实现 get_tool_description 方法
+            
+        Returns:
+            List[Dict[str, Any]]: 格式化后的工具列表
+        """
+        formatted_tools = []
+        for tool in tools:
+            try:
+                tool_desc = tool.get_tool_description()
+                formatted_tools.append({
+                    "function": {
+                        "strict": False,
+                        "name": tool_desc.get("name", "未知工具"),
+                        "description": tool_desc.get("description", "无描述")
+                    },
+                    "type": "function"
+                })
+            except Exception as e:
+                print(f"获取工具描述失败: {str(e)}")
+                continue
+        return formatted_tools
+    
+   

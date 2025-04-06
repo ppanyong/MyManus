@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyManus AI Assistant</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .column {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        h1, h2 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .chat-container {
+            height: 500px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+        .task-container {
+            height: 250px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+        .log-container {
+            height: 250px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            background-color: #fffbe6;
+            font-family: monospace;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .user-message {
+            background-color: #e3f2fd;
+            margin-left: 20%;
+        }
+        .assistant-message {
+            background-color: #f5f5f5;
+            margin-right: 20%;
+        }
+        .system-message {
+            background-color: #fff8e1;
+            margin: 10px 0;
+            text-align: center;
+            font-style: italic;
+            color: #795548;
+            border-left: 3px solid #ffc107;
+        }
+        .input-container {
+            display: flex;
+            gap: 10px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #2196f3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #1976d2;
+        }
+        .status {
+            text-align: center;
+            color: #666;
+            margin-top: 10px;
+        }
+        .task-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 5px 0;
+        }
+        .task-checkbox {
+            width: 18px;
+            height: 18px;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .log-time {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .log-error {
+            color: #d32f2f;
+            background-color: #ffebee;
+        }
+        /* 添加思考中的动画样式 */
+        .thinking {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 10px;
+            margin-right: 20%;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        
+        .dot {
+            width: 8px;
+            height: 8px;
+            background-color: #2196f3;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+        
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+        .task-list {
+            margin: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .task-item {
+            padding: 10px;
+            margin: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .task-completed {
+            background-color: #e8f5e9;
+        }
+        .task-pending {
+            background-color: #fff3e0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 左列：对话框 -->
+        <div class="column">
+            <h2>对话交互</h2>
+            <div class="chat-container" id="chatContainer"></div>
+            <div class="input-container">
+                <input type="text" id="userInput" placeholder="请输入您的问题...">
+                <button onclick="sendMessage()">发送</button>
+            </div>
+            <div class="status" id="status">系统已就绪</div>
+        </div>
+
+        <!-- 右列：任务记录和日志 -->
+        <div class="column">
+            <h2>任务记录</h2>
+            <div class="task-container" id="taskContainer">
+                <!-- 任务列表将在这里动态添加 -->
+            </div>
+            
+            <h2>执行日志</h2>
+            <div class="log-container" id="logContainer">
+                <!-- 日志将在这里动态添加 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加思考中的HTML模板 -->
+    <template id="thinkingTemplate">
+        <div class="thinking">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <span style="margin-left: 8px">思考中...</span>
+        </div>
+    </template>
+
+    <div class="task-list" id="taskList">
+        <h2>任务列表</h2>
+        <div id="tasks"></div>
+    </div>
+
+    <script>
+        const chatContainer = document.getElementById('chatContainer');
+        const taskContainer = document.getElementById('taskContainer');
+        const logContainer = document.getElementById('logContainer');
+        const userInput = document.getElementById('userInput');
+        const status = document.getElementById('status');
+
+        // 连接到 Socket.IO
+        const socket = io('/manus');
+
+        async function checkStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                status.textContent = `系统状态: ${data.status}可用工具数= ${data.tools_count}`;
+            } catch (error) {
+                status.textContent = '系统状态检查失败';
+            }
+        }
+
+        // 添加显示和隐藏思考状态的函数
+        function showThinking() {
+            const template = document.getElementById('thinkingTemplate');
+            const thinking = template.content.cloneNode(true);
+            chatContainer.appendChild(thinking);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function hideThinking() {
+            const thinking = chatContainer.querySelector('.thinking');
+            if (thinking) {
+                thinking.remove();
+            }
+        }
+
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            addMessage(message, 'user');
+            userInput.value = '';
+            
+            // 显示思考状态
+            showThinking();
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message })
+                });
+                
+                // 隐藏思考状态
+                hideThinking();
+                
+                const data = await response.json();
+                if (data.status === 'success') {
+                    if (data.response) {
+                        
+                        if (data.response.result) {
+                            addMessage(data.response.result, 'assistant');
+                        }
+                        if (data.response.tasks) {
+                            updateTasks(data.response.tasks);
+                        }
+                        
+                        if (data.response.logs) {
+                            updateLogs(data.response.logs);
+                        }
+                    }
+                } else {
+                    addMessage('抱歉，处理您的请求时出现错误: ' + data.message, 'assistant');
+                }
+            } catch (error) {
+                // 发生错误时也要隐藏思考状态
+                hideThinking();
+                addMessage('抱歉，发送请求时出现错误', 'assistant');
+            }
+        }
+
+        function addMessage(text, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}-message`;
+            messageDiv.textContent = text;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function updateTasks(tasks) {
+            taskContainer.innerHTML = '';
+            tasks.forEach((task, index) => {
+                const taskDiv = document.createElement('div');
+                taskDiv.className = 'task-item';
+                taskDiv.innerHTML = `
+                    <input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''}>
+                    <span>${task.description}</span>
+                `;
+                taskContainer.appendChild(taskDiv);
+            });
+        }
+
+        function updateLogs(logs) {
+            // 如果logs是对象而不是数组，将其转换为数组形式
+            if (!Array.isArray(logs)) {
+                let logMessage = '';
+                if (logs.status === 'error') {
+                    logMessage = logs.error || '未知错误';
+                } else {
+                    logMessage = logs.result || JSON.stringify(logs);
+                }
+                logs = [logMessage];
+            }
+
+            logs.forEach(log => {
+                const logDiv = document.createElement('div');
+                logDiv.className = 'log-entry';
+                
+                // 根据日志类型添加不同的样式
+                if (typeof log === 'object' && log.status === 'error') {
+                    logDiv.className += ' log-error';
+                }
+                
+                const logContent = typeof log === 'object' ? 
+                    (log.error || log.result || JSON.stringify(log)) : log;
+                
+                logDiv.innerHTML = `
+                    <span class="log-time">[${new Date().toLocaleTimeString()}]</span>
+                    <span>${logContent}</span>
+                `;
+                logContainer.appendChild(logDiv);
+                logContainer.scrollTop = logContainer.scrollHeight;
+            });
+        }
+
+        userInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // 监听任务列表更新事件
+        socket.on('update_tasks_ui', function(data) {
+            const tasksDiv = document.getElementById('tasks');
+            tasksDiv.innerHTML = ''; // 清空现有任务
+            updateTasks(data.tasks);
+
+        });
+
+        // 监听系统消息追加事件
+        socket.on('append_system_message_ui', function(data) {
+            
+
+            addMessage(data.message, 'system');
+            
+            // 同时在日志容器中显示
+            const logDiv = document.createElement('div');
+            logDiv.className = 'log-entry';
+            logDiv.innerHTML = `
+                <span class="log-time">[${new Date().toLocaleTimeString()}]</span>
+                <span>系统消息: ${data.message}</span>
+            `;
+            logContainer.appendChild(logDiv);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        });
+        
+
+        // 连接状态处理
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server');
+        });
+
+        // 初始化
+        checkStatus();
+    </script>
+</body>
+</html>

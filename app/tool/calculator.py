@@ -36,7 +36,7 @@ class CalculatorTool:
             }
     
     def get_tool_description(self) -> Dict[str, Any]:
-        """返回工具描述，符合MCP协议"""
+        """返回工具描述，符合MCP协议""" 
         return {
             "name": "calculator",
             "description": "一个简单的计算器工具，提供基础的数学运算功能",

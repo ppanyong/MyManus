@@ -18,7 +18,7 @@ log_level = "INFO"
 [api]
 url = "https://api.siliconflow.cn/v1/chat/completions"
 model = "Qwen/Qwen2.5-14B-Instruct"
-api_key = "sk-gxvwereqdwaoxtgqqfouwzmvkqhtczxisxnowxovuinakyxg"
+api_key = "sk-kdkfuhslcifznaksoowxljbbwibdzaalnldeycehaulsvxfn"
 temperature = 0.7
 max_tokens = 4096
 stream = false
