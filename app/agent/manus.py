@@ -5,26 +5,25 @@ from jinja2 import Template
 from .base import ToolCallAgent
 from ..flow.planning import PlanningFlow
 from ..flow.react import ReactFlow
-from flask_socketio import SocketIO
 import asyncio
 import ast
 
 class ManusAgent(ToolCallAgent):
     """主智能体实现，负责任务规划和执行"""
     
-    def __init__(self, config: Dict[str, Any], socketio: SocketIO = None):
+    def __init__(self, config: Dict[str, Any], ui=None):
         """
         初始化主智能体
         
         Args:
             config: 配置信息
-            socketio: SocketIO实例，用于实时更新UI
+            ui: UI实例，用于实时更新UI
         """
         super().__init__(config)
-        self.socketio = socketio
+        self.ui = ui
         self.prompt_template = self._load_prompt_template()
         self.planning_flow = PlanningFlow(config)
-        #self.react_flow = ReactFlow(config)
+        self.react_flow = ReactFlow(config)
         self.memory = []  # 用于存储执行结果
         self.current_task_index = 0
         self.tools = []
@@ -32,15 +31,15 @@ class ManusAgent(ToolCallAgent):
     def initialize(self) -> Dict[str, Any]:
         """初始化主智能体"""
         try:
-            # 初始化规划流程
+            # 使用planning_flow初始化 
             init_result = self.planning_flow.initialize()
             if init_result.get("status") == "error":
                 return init_result
                 
-            # 不再初始化 react_flow，因为它会在需要时创建
-            # react_init_result = self.react_flow.initialize()
-            # if react_init_result.get("status") == "error":
-            #     return react_init_result
+            # 初始化react_flow
+            react_init_result = self.react_flow.initialize()
+            if react_init_result.get("status") == "error":
+                return react_init_result
                 
             return {
                 "status": "success",
@@ -63,19 +62,17 @@ class ManusAgent(ToolCallAgent):
         Args:
             tasks: 任务列表
         """
-        if not self.socketio:
-            print("警告: socketio 未初始化，无法发送任务更新")
+        if not self.ui:
+            print("警告: UI 未初始化，无法发送任务更新")
             return
         if not tasks:
             print("警告: 任务列表为空，无法发送任务更新")
             return
         try:
-            # 通过socketio发送任务列表更新事件
-            self.socketio.emit('update_tasks_ui', { 
-                'tasks': tasks
-            }, namespace='/manus')
+            # 通过UI实例发送任务列表更新
+            self.ui.update_tasks_ui(tasks)
         except Exception as e:
-            print(f"更新任务列表失败: {str(e)}")
+            print(f"调用UI的update_tasks_ui方法，更新任务列表失败，原因是: {str(e)}")
             
     def _append_system_message(self, message: str) -> None:
         """
@@ -84,27 +81,42 @@ class ManusAgent(ToolCallAgent):
         Args:
             message: 系统消息内容
         """
-        if not self.socketio:
-            print("警告: socketio 未初始化，无法发送系统消息")
+        if not self.ui:
+            print("警告: UI 未初始化，无法发送系统消息")
             return
             
         try:
-            # 同时发送到UI
-            self.socketio.emit('append_system_message_ui', {
-                'message': message
-            }, namespace='/manus')
+            # 通过UI实例发送系统消息
+            self.ui.append_system_message_ui(message)
         except Exception as e:
             print(f"发送系统消息失败: {str(e)}")
 
+    def _update_result_ui(self, memory: List[Dict[str, Any]]) -> None:
+        """
+        更新结果UI
+        
+        Args:
+            memory: 执行结果记忆列表
+        """
+        if not self.ui:
+            print("警告: UI 未初始化，无法更新结果UI")
+            return
+            
+        try:
+            # 通过UI实例更新结果UI
+            self.ui.update_result_ui(memory)
+        except Exception as e:
+            print(f"更新结果UI失败: {str(e)}")
+
     async def execute(self, user_request: str) -> Dict[str, Any]:
         """
-        异步执行任务，使用模板处理
+        主任务启动方法
         
         Args:
             task: 用户任务描述
             
         Returns:
-            Dict[str, Any]: 执行结果
+            Dict[str, Any]: 主任务第一次同步执行结果
         """
         try:
             # 1. 生成任务计划
@@ -114,21 +126,8 @@ class ManusAgent(ToolCallAgent):
                     "logs": plan
                 }
             
-            # 2. 解析计划步骤（最多20步）
-            result_str = plan.get("result", "[]")
-            try:
-                # 尝试将字符串转换为 Python 对象
-                tasks = json.loads(result_str)
-            except json.JSONDecodeError:
-                # 如果解析失败，尝试使用更宽松的方式
-
-                try:
-                    # 使用 ast.literal_eval 解析 Python 字面量
-                    tasks = ast.literal_eval(result_str)
-                except (SyntaxError, ValueError):
-                    # 如果仍然失败，返回空列表
-                    tasks = []
-                    print(f"无法解析任务计划: {result_str}")
+            # 2. 解析计划步骤
+            tasks = self._parse_planning_result(plan)
             
             if not tasks:
                 return {
@@ -140,15 +139,12 @@ class ManusAgent(ToolCallAgent):
                 }
             
             # 将计划显示到页面
-            if self.socketio:
-                self.socketio.emit('update_plan_ui', {
-                    'plan': tasks
-                }, namespace='/manus')
+            if self.ui:
+                self.ui.update_plan_ui(tasks)
             else:
-                print("警告: socketio 未初始化，无法发送计划更新")
+                print("警告: UI 未初始化，无法发送计划更新")
             
             # 3. 初始化任务列表
-            
             self.current_task_index = 0
             
             # 4. 返回初始状态
@@ -182,58 +178,23 @@ class ManusAgent(ToolCallAgent):
                 }
             }
     
-    async def _execute_task_chain(self, tasks: List[Dict[str, Any]]):
+    async def _execute_task_chain(self, tasks: List[Dict[str, Any]]) -> None:
         """
-        异步执行任务链，使ReactFlow实例头尾相连
+        执行任务链
         
         Args:
             tasks: 任务列表
         """
-        # 创建一个共享的ReactFlow实例
-        react_flow = ReactFlow(self.config)
-        react_flow.memory = []  # 明确初始化内存
-        
-        # 初始化 ReactFlow
-        init_result = react_flow.initialize()
-        if init_result.get("status") != "success":
-            self._append_system_message(f"系统: ReactFlow 初始化失败: {init_result.get('error')}")
-            return
-            
-        self._append_system_message("系统: ReactFlow 初始化成功，开始执行任务链...")
-        
-        # 用于存储前一个任务的结果
-        previous_result = None
-        
-        for i, task in enumerate(tasks):
-            try:
+        try:
+            for i, task in enumerate(tasks):
                 # 更新当前任务索引
                 self.current_task_index = i
                 
-                # 如果有前一个任务的结果，将其添加到当前任务的上下文中
-                if previous_result and previous_result.get("status") == "success":
-                    # 将前一个任务的结果添加到当前任务的上下文中
-                    if "context" not in task:
-                        task["context"] = {}
-                    
-                    # 添加前一个任务的结果到上下文
-                    task["context"]["previous_result"] = previous_result.get("result")
-                    task["context"]["previous_task_info"] = previous_result.get("task_info")
-                    
-                    # 打印详细的过程执行信息
-                    self._append_system_message(f"系统: 步骤 {i+1} 将使用前一个步骤的结果作为上下文")
+                # 执行任务
+                step_result = await self.react_flow.execute(task, self.tools)
                 
-                # 使用 ReactFlow 执行任务
-                self._append_system_message(f"系统: 开始执行步骤 {i+1}: {task.get('description', '未知任务')}")
-                
-                # 使用异步线程执行任务
-                step_result = await asyncio.to_thread(react_flow.execute, task, self.tools)
-                
-                # 只存储必要的信息，避免循环引用
-                result_copy = {
-                    "status": step_result.get("status"),
-                    "result": step_result.get("result"),
-                    "error": step_result.get("error")
-                }
+                # 复制结果，避免修改原始对象
+                result_copy = step_result.copy()
                 
                 # 更新任务状态和结果
                 if step_result.get("status") == "success":
@@ -247,7 +208,7 @@ class ManusAgent(ToolCallAgent):
                     self.add_memory({
                         "type": "step_result",
                         "step": i + 1,
-                        "task": task,
+                        "task": task.get("description", "未知任务"),
                         "result": result_copy.get("result"),
                         "task_info": step_result.get("task_info")
                     })
@@ -255,7 +216,11 @@ class ManusAgent(ToolCallAgent):
                     # 打印详细的结果信息
                     self._append_system_message(f"系统: 步骤 {i+1} 执行成功")
                     if step_result.get("result"):
-                        self._append_system_message(f"系统: 步骤 {i+1} 结果: {json.dumps(step_result.get('result'), ensure_ascii=False)}")
+                        try:
+                            result_str = json.dumps(step_result.get("result"), ensure_ascii=False)
+                            self._append_system_message(f"系统: 步骤 {i+1} 结果: {result_str}")
+                        except Exception as e:
+                            self._append_system_message(f"系统: 步骤 {i+1} 结果无法序列化: {str(e)}")
                 else:
                     tasks[i].update({
                         "completed": False,
@@ -268,47 +233,22 @@ class ManusAgent(ToolCallAgent):
                 # 存储执行结果，避免存储整个对象
                 self.memory.append({
                     "step": i + 1,
-                    "task": task,
-                    "result": result_copy
+                    "task": task.get("description", "未知任务"),
+                    "result": result_copy.get("result"),
+                    "status": result_copy.get("status"),
+                    "error": result_copy.get("error")
                 })
                 
-                # 添加执行日志
-                print({
-                    "type": "step",
-                    "message": f"步骤 {i+1}: {task}",
-                    "status": step_result.get("status"),
-                    "result": step_result.get("result")
-                })
+                # 更新UI
+                if self.ui:
+                    try:
+                        self.ui.update_plan_ui(tasks)
+                    except Exception as e:
+                        print(f"更新任务列表失败: {str(e)}")
                 
-                # 保存当前任务的结果，用于下一个任务
-                previous_result = step_result
-                
-                # 等待一小段时间，让UI有时间更新
-                await asyncio.sleep(1)
-                
-            except Exception as e:
-                error_msg = f"步骤 {i+1} 执行失败: {str(e)}"
-                print({
-                    "type": "error",
-                    "message": error_msg
-                })
-                
-                tasks[i].update({
-                    "completed": False,
-                    "error": error_msg
-                })
-                
-                self._append_system_message(f"系统: {error_msg}")
-                self._update_task_list(tasks)
-                
-                # 即使出错，也等待一小段时间
-                await asyncio.sleep(1)
-                
-        # 所有任务执行完成
-        self._append_system_message("系统: 所有任务执行完成！")
-        
-        # 清理 ReactFlow 实例
-        del react_flow
+        except Exception as e:
+            print(f"执行任务链失败: {str(e)}")
+            self._append_system_message(f"系统: 执行任务链失败: {str(e)}")
     
     def _generate_task_plan(self, task: str) -> Dict[str, Any]:
         """
@@ -376,4 +316,90 @@ class ManusAgent(ToolCallAgent):
             memory_item: 记忆项
         """
         self.memory.append(memory_item)
+        
+    def set_ui(self, ui):
+        """
+        设置UI实例
+        
+        Args:
+            ui: UI实例
+        """
+        self.ui = ui
+        return True
+    
+    def _parse_planning_result(self, plan_result: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        解析任务规划结果，将JSON格式的规划结果转换为任务列表
+        
+        Args:
+            plan_result: 规划流程返回的结果
+            
+        Returns:
+            List[Dict[str, Any]]: 解析后的任务列表
+        """
+        try:
+            # 检查规划结果状态
+            if plan_result.get("status") != "success":
+                print(f"规划结果状态错误: {plan_result.get('status')}")
+                return []
+                
+            # 获取规划结果
+            result = plan_result.get("result", [])
+            
+            # 如果result已经是列表，直接使用
+            if isinstance(result, list):
+                tasks = result
+            else:
+                # 如果result是字符串，尝试解析JSON格式
+                result_str = str(result)
+                try:
+                    tasks = json.loads(result_str)
+                except json.JSONDecodeError:
+                    # 如果JSON解析失败，尝试使用ast.literal_eval解析Python字面量
+                    try:
+                        tasks = ast.literal_eval(result_str)
+                    except (SyntaxError, ValueError):
+                        print(f"无法解析任务计划: {result_str}")
+                        return []
+                    
+            # 验证任务列表格式
+            if not isinstance(tasks, list):
+                print(f"任务计划格式错误，应为列表: {type(tasks)}")
+                return []
+                
+            # 验证每个任务的格式并转换为字典
+            valid_tasks = []
+            for i, task in enumerate(tasks):
+                # 如果任务是字符串，将其转换为字典
+                if isinstance(task, str):
+                    task_dict = {
+                        "description": task,
+                        "id": i + 1,
+                        "completed": False
+                    }
+                    valid_tasks.append(task_dict)
+                    continue
+                    
+                # 如果任务已经是字典，验证其格式
+                if not isinstance(task, dict):
+                    print(f"任务 {i+1} 格式错误，应为字典或字符串: {type(task)}")
+                    continue
+                    
+                # 确保任务包含必要的字段
+                if "description" not in task:
+                    print(f"任务 {i+1} 缺少description字段")
+                    continue
+                    
+                # 添加任务ID和完成状态
+                task["id"] = i + 1
+                task["completed"] = False
+                
+                valid_tasks.append(task)
+                
+            print(f"成功解析任务计划，共 {len(valid_tasks)} 个有效任务")
+            return valid_tasks
+            
+        except Exception as e:
+            print(f"解析任务规划结果失败: {str(e)}")
+            return []
        

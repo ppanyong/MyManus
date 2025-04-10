@@ -3,6 +3,7 @@ import asyncio
 from unittest.mock import MagicMock, patch
 import json
 import os
+import toml
 from app.agent.manus import ManusAgent
 from app.flow.planning import PlanningFlow
 from app.flow.react import ReactFlow
@@ -12,23 +13,17 @@ class TestManusAgent(unittest.TestCase):
     
     def setUp(self):
         """测试前的准备工作"""
-        # 创建配置字典
-        self.config = {
-            'api': {
-                'url': 'https://api.example.com',
-                'api_key': 'test_api_key',
-                'model': 'test_model',
-                'temperature': 0.7,
-                'max_tokens': 4096
-            }
-        }
+        # 从config.toml中读取配置
+        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'config.toml')
+        self.config = toml.load(config_path)
         
         # 创建ManusAgent实例
         self.agent = ManusAgent(self.config)
         
-        # 创建模拟的SocketIO对象
-        self.mock_socketio = MagicMock()
-        self.agent.socketio = self.mock_socketio
+        # 创建模拟的UI对象
+        self.mock_ui = MagicMock()
+        # 使用set_ui方法设置UI实例
+        self.agent.set_ui(self.mock_ui)
         
     def test_initialization(self):
         """测试初始化方法"""
@@ -73,12 +68,8 @@ class TestManusAgent(unittest.TestCase):
         # 调用更新任务列表方法
         self.agent._update_task_list(tasks)
         
-        # 验证socketio.emit被调用
-        self.mock_socketio.emit.assert_called_once_with(
-            'update_plan', 
-            {'tasks': tasks}, 
-            namespace='/manus'
-        )
+        # 验证UI实例的update_tasks_ui方法被调用
+        self.mock_ui.update_tasks_ui.assert_called_once_with(tasks)
         
     def test_append_system_message(self):
         """测试追加系统消息方法"""
@@ -88,12 +79,8 @@ class TestManusAgent(unittest.TestCase):
         # 调用追加系统消息方法
         self.agent._append_system_message(message)
         
-        # 验证socketio.emit被调用
-        self.mock_socketio.emit.assert_called_once_with(
-            'append_system_message', 
-            {'message': message}, 
-            namespace='/manus'
-        )
+        # 验证UI实例的append_system_message_ui方法被调用
+        self.mock_ui.append_system_message_ui.assert_called_once_with(message)
         
     def test_generate_task_plan(self):
         """测试生成任务计划方法"""
@@ -337,6 +324,30 @@ class TestManusAgent(unittest.TestCase):
         
         # 验证方法被调用
         mock_generate_task_plan.assert_called_once_with(user_request)
+
+    def test_update_result_ui(self):
+        """测试更新结果UI方法"""
+        # 创建测试记忆列表
+        memory = [
+            {
+                "type": "step_result",
+                "step": 1,
+                "task": {"description": "任务1"},
+                "result": "结果1"
+            },
+            {
+                "type": "step_result",
+                "step": 2,
+                "task": {"description": "任务2"},
+                "result": "结果2"
+            }
+        ]
+        
+        # 调用更新结果UI方法
+        self.agent._update_result_ui(memory)
+        
+        # 验证UI实例的update_result_ui方法被调用
+        self.mock_ui.update_result_ui.assert_called_once_with(memory)
 
 if __name__ == '__main__':
     unittest.main() 

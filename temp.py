@@ -1,1 +1,1 @@
-from tools import FileManager; FileManager.write('result.txt', '{step_1_result}')
+from bs4 import BeautifulSoup; soup = BeautifulSoup(step_1_result, 'html.parser'); links = [link.get('href') for link in soup.find_all('a', text=lambda text: '新闻' in text)]; print(links)

@@ -9,3 +9,4 @@ flask[async]==3.0.2
 json_repair
 bs4
 hypercorn==0.15.0
+playwright==1.41.0

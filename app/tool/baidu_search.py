@@ -11,7 +11,7 @@ import asyncio
 from playwright.async_api import async_playwright, Page, Browser, BrowserContext
 from PIL import Image
 
-class GoogleSearchTool:
+class BaiduSearchTool:
     """百度搜索工具"""
     
     def __init__(self, config: Dict[str, Any]):
@@ -76,88 +76,75 @@ class GoogleSearchTool:
         
     async def _ensure_browser_initialized(self):
         """确保浏览器已初始化"""
-        if not self.browser:
+        try:
+            # 如果已经有浏览器实例，先尝试清理
+            if self.browser or self.context or self.page:
+                print("检测到现有浏览器实例，进行清理...")
+                try:
+                    if self.page:
+                        await self.page.close()
+                    if self.context:
+                        await self.context.close()
+                    if self.browser:
+                        await self.browser.close()
+                except Exception as e:
+                    print(f"清理现有浏览器实例时出错: {str(e)}")
+                finally:
+                    self.browser = None
+                    self.context = None
+                    self.page = None
+            
+            # 初始化浏览器
+            print("正在初始化 playwright...")
+            playwright = await async_playwright().start()
+            print("正在启动浏览器...")
+            
+            # 生成浏览器指纹
+            fingerprint = self._get_random_fingerprint()
+            print("生成浏览器指纹...")
+            
+            # 启动浏览器
+            browser_args = ['--no-sandbox']
+            if self.debug:
+                browser_args.append('--remote-debugging-port=9222')
+                print("启用远程调试端口: 9222")
+            
+            print(f"浏览器启动模式: {'无头模式' if self.headless else '有界面模式'}")
+            self.browser = await playwright.chromium.launch(
+                headless=self.headless,
+                args=browser_args
+            )
+            
+            # 创建上下文
+            print("创建浏览器上下文...")
+            self.context = await self.browser.new_context(
+                viewport={'width': 1920, 'height': 1080},
+                user_agent=random.choice(self.user_agents)
+            )
+            
+            # 创建新页面
+            print("创建新页面...")
+            self.page = await self.context.new_page()
+            print("浏览器初始化完成")
+            
+        except Exception as e:
+            print(f"浏览器初始化失败: {str(e)}")
+            # 清理资源
             try:
-                # 初始化浏览器
-                print("正在初始化 playwright...")
-                playwright = await async_playwright().start()
-                print("正在启动浏览器...")
-                
-                # 生成浏览器指纹
-                fingerprint = self._get_random_fingerprint()
-                print("生成浏览器指纹...")
-                
-                # 启动浏览器
-                browser_args = ['--no-sandbox']
-                if self.debug:
-                    browser_args.append('--remote-debugging-port=9222')
-                    print("启用远程调试端口: 9222")
-                
-                print(f"浏览器启动模式: {'无头模式' if self.headless else '有界面模式'}")
-                self.browser = await playwright.chromium.launch(
-                    headless=self.headless,
-                    args=browser_args
-                )
-                
-                # 创建上下文
-                print("创建浏览器上下文...")
-                self.context = await self.browser.new_context(
-                    viewport={'width': 1920, 'height': 1080},
-                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                )
-                
-                # 注入浏览器指纹
-                print("注入浏览器指纹...")
-                await self.context.add_init_script(f"""
-                    Object.defineProperty(navigator, 'webdriver', {{
-                        get: () => undefined
-                    }});
-                    
-                    Object.defineProperty(navigator, 'platform', {{
-                        get: () => '{fingerprint["platform"]}'
-                    }});
-                    
-                    Object.defineProperty(navigator, 'hardwareConcurrency', {{
-                        get: () => {fingerprint["hardware_concurrency"]}
-                    }});
-                    
-                    Object.defineProperty(navigator, 'deviceMemory', {{
-                        get: () => {fingerprint["device_memory"]}
-                    }});
-                    
-                    Object.defineProperty(navigator, 'maxTouchPoints', {{
-                        get: () => {fingerprint["touch_points"]}
-                    }});
-                    
-                    const getParameter = WebGLRenderingContext.prototype.getParameter;
-                    WebGLRenderingContext.prototype.getParameter = function(parameter) {{
-                        if (parameter === 37445) {{
-                            return '{fingerprint["webgl_vendor"]}';
-                        }}
-                        if (parameter === 37446) {{
-                            return '{fingerprint["webgl_renderer"]}';
-                        }}
-                        return getParameter.call(this, parameter);
-                    }};
-                """)
-                
-                # 创建新页面
-                print("创建新页面...")
-                self.page = await self.context.new_page()
-                print("浏览器初始化完成")
-                
-            except Exception as e:
-                print(f"浏览器初始化失败: {str(e)}")
-                # 清理资源
-                if self.browser:
-                    await self.browser.close()
+                if self.page:
+                    await self.page.close()
                 if self.context:
                     await self.context.close()
+                if self.browser:
+                    await self.browser.close()
+            except Exception as cleanup_error:
+                print(f"清理资源时出错: {str(cleanup_error)}")
+            finally:
                 self.browser = None
                 self.context = None
                 self.page = None
-                raise
-            
+            raise
+        
     async def _simulate_human_behavior(self):
         """模拟人类行为"""
         try:
@@ -203,7 +190,7 @@ class GoogleSearchTool:
             # 等待搜索结果加载
             print("等待搜索结果加载...")
             try:
-                await self.page.wait_for_selector('.result', timeout=10000)  # 百度搜索结果选择器
+                await self.page.wait_for_selector('.c-container', timeout=10000)  # 百度搜索结果选择器
             except Exception as e:
                 error_msg = str(e)
                 if "timeout" in error_msg.lower():
@@ -212,40 +199,37 @@ class GoogleSearchTool:
                     raise
             
             # 获取搜索结果
-            search_results = await self.page.query_selector_all('.result')
+            search_results = await self.page.query_selector_all('.c-container')
             print(f"找到 {len(search_results)} 个搜索结果")
             
             # 处理搜索结果
             for result in search_results:
                 try:
                     # 提取标题和链接
-                    title_elem = await result.query_selector('h3 a')
+                    title_elem = await result.query_selector('h3.c-title a')
+                    print(f"提取标题和链接: {title_elem}")
                     if not title_elem:
                         continue
                         
                     title = await title_elem.text_content()
                     title = title.strip() if title else ""
-                    
+                    print(f"提取标题: {title}")
                     link = await title_elem.get_attribute('href')
                     link = link or ""
+                    print(f"提取链接: {link}")
                     
-                    # 验证链接
-                    if not link or link.startswith('/search') or 'baidu.com' in link:
-                        continue
                     
                     # 提取摘要
                     snippet = ""
-                    snippet_elem = await result.query_selector('.c-abstract')
-                    if snippet_elem:
-                        snippet = await snippet_elem.text_content()
-                        snippet = snippet.strip() if snippet else ""
-                    
-                    if not snippet:
-                        snippet_elem = await result.query_selector('.content')
+                    # 尝试多种可能的摘要选择器
+                    for selector in ['.content-right_1THTn', '.c-abstract', '.c-row', '.c-span-last']:
+                        snippet_elem = await result.query_selector(selector)
                         if snippet_elem:
                             snippet = await snippet_elem.text_content()
                             snippet = snippet.strip() if snippet else ""
-                    
+                            if snippet:
+                                break
+                    print(f"提取摘要: {snippet}")
                     # 添加结果
                     if title and link:
                         result_item = {
@@ -361,7 +345,7 @@ class GoogleSearchTool:
                     raise Exception(f"保存截图失败，已重试{max_retries}次: {str(e)}")
         
     async def search(self, query: str, max_results: int = 5) -> Dict[str, Any]:
-        """执行Google搜索"""
+        """执行百度搜索"""
         try:
             print(f"开始执行搜索: {query}, 最大结果数: {max_results}")
             results = await self._perform_search(query, max_results)
@@ -392,14 +376,39 @@ class GoogleSearchTool:
         finally:
             # 清理资源
             print("清理浏览器资源...")
-            if self.browser:
-                await self.browser.close()
-            if self.context:
-                await self.context.close()
-            self.browser = None
-            self.context = None
-            self.page = None
-            print("浏览器资源清理完成")
+            try:
+                # 先关闭页面
+                if hasattr(self, 'page') and self.page:
+                    try:
+                        await self.page.close()
+                    except Exception as e:
+                        print(f"关闭页面时出错: {str(e)}")
+                
+                # 再关闭上下文
+                if hasattr(self, 'context') and self.context:
+                    try:
+                        await self.context.close()
+                    except Exception as e:
+                        print(f"关闭上下文时出错: {str(e)}")
+                
+                # 最后关闭浏览器
+                if hasattr(self, 'browser') and self.browser:
+                    try:
+                        await self.browser.close()
+                    except Exception as e:
+                        print(f"关闭浏览器时出错: {str(e)}")
+                
+                # 重置实例变量
+                self.browser = None
+                self.context = None
+                self.page = None
+                print("浏览器资源清理完成")
+            except Exception as e:
+                print(f"资源清理过程中出错: {str(e)}")
+                # 确保实例变量被重置
+                self.browser = None
+                self.context = None
+                self.page = None
                 
     def _get_random_fingerprint(self):
         """生成随机浏览器指纹"""
@@ -415,12 +424,12 @@ class GoogleSearchTool:
     def get_tool_description(self) -> Dict[str, Any]:
         """返回工具描述，符合MCP协议"""
         return {
-            "name": "google_search",
-            "description": "Google搜索工具,可以执行网络搜索并返回结果",
+            "name": "baidu_search",
+            "description": "百度搜索工具,可以执行网络搜索并返回结果",
             "functions": [
                 {
                     "name": "search",
-                    "description": "执行Google搜索查询",
+                    "description": "执行百度搜索查询",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -455,4 +464,4 @@ class GoogleSearchTool:
                     }
                 }
             ]
-        }
+        } 

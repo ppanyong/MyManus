@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyManus AI Assistant</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #2A5CAA;
+            --primary-light: #4A7BCA;
+            --primary-dark: #1A4C8A;
+            --success-color: #28A745;
+            --danger-color: #DC3545;
+            --warning-color: #FFC107;
+            --light-bg: #F8F9FA;
+            --dark-text: #333333;
+            --medium-text: #666666;
+            --light-text: #999999;
+            --border-color: #E0E0E0;
+            --shadow: 0 2px 10px rgba(0,0,0,0.1);
+            --transition: all 0.3s ease;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--light-bg);
+            color: var(--dark-text);
+            overflow: hidden;
+        }
+        
+        .app-container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+        
+        /* 左侧区域 - 任务流程看板 */
+        .task-board {
+            width: 30%;
+            background-color: white;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+        }
+        
+        .task-board-header {
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .task-timeline {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .timeline-node {
+            position: relative;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            background-color: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: var(--transition);
+        }
+        
+        .timeline-node:hover {
+            box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+        }
+        
+        .timeline-node::before {
+            content: '';
+            position: absolute;
+            left: -10px;
+            top: 50%;
+            width: 20px;
+            height: 2px;
+            background-color: var(--border-color);
+        }
+        
+        .timeline-node:first-child::before {
+            display: none;
+        }
+        
+        .node-status {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .status-icon {
+            margin-right: 10px;
+            font-size: 18px;
+        }
+        
+        .status-in-progress {
+            color: var(--primary-color);
+            animation: pulse 1.5s infinite;
+        }
+        
+        .status-completed {
+            color: var(--success-color);
+        }
+        
+        .status-failed {
+            color: var(--danger-color);
+        }
+        
+        .node-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .node-time {
+            font-size: 12px;
+            color: var(--light-text);
+        }
+        
+        .node-actions {
+            display: none;
+            position: absolute;
+            right: 10px;
+            top: 10px;
+        }
+        
+        .timeline-node:hover .node-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .action-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--medium-text);
+            transition: var(--transition);
+        }
+        
+        .action-btn:hover {
+            color: var(--primary-color);
+        }
+        
+        /* 中央区域 - 实时执行面板 */
+        .execution-panel {
+            width: 50%;
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+        }
+        
+        .panel-header {
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--primary-color);
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .resource-monitor {
+            display: flex;
+            padding: 10px;
+            background-color: var(--light-bg);
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .resource-item {
+            flex: 1;
+            text-align: center;
+            padding: 5px;
+        }
+        
+        .resource-label {
+            font-size: 12px;
+            color: var(--medium-text);
+        }
+        
+        .resource-value {
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+        
+        .wave-container {
+            height: 30px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .wave {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-light) 0%, var(--primary-color) 50%, var(--primary-light) 100%);
+            background-size: 200% 100%;
+            animation: wave 2s infinite linear;
+        }
+        
+        .execution-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        
+        .code-editor {
+            width: 50%;
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            background-color: #1E1E1E;
+            color: #D4D4D4;
+        }
+        
+        .output-log {
+            width: 50%;
+            overflow-y: auto;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            background-color: #1E1E1E;
+            color: #D4D4D4;
+        }
+        
+        .tab-container {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .tab {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: var(--transition);
+        }
+        
+        .tab.active {
+            border-bottom-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+        
+        /* 右侧区域 - 结果预览 */
+        .result-preview {
+            width: 20%;
+            background-color: white;
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow);
+        }
+        
+        .preview-header {
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .preview-content {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+        }
+        
+        .summary-box {
+            background-color: var(--light-bg);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .summary-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: var(--primary-color);
+        }
+        
+        .chart-container {
+            height: 200px;
+            margin-bottom: 20px;
+            background-color: var(--light-bg);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .file-tree {
+            margin-top: 20px;
+        }
+        
+        .file-item {
+            padding: 5px 0;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .file-item:hover {
+            color: var(--primary-color);
+        }
+        
+        .file-icon {
+            margin-right: 5px;
+        }
+        
+        /* 动画效果 */
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(42, 92, 170, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(42, 92, 170, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(42, 92, 170, 0); }
+        }
+        
+        @keyframes wave {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 200% 0%; }
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 1200px) {
+            .app-container {
+                flex-direction: column;
+            }
+            
+            .task-board, .execution-panel, .result-preview {
+                width: 100%;
+                height: auto;
+            }
+            
+            .task-board {
+                max-height: 30vh;
+            }
+            
+            .result-preview {
+                max-height: 30vh;
+            }
+        }
+        
+        /* 保留原有样式，但进行整合 */
+        .chat-container {
+            height: 100%;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        
+        .message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        .user-message {
+            background-color: #e3f2fd;
+            margin-left: 20%;
+        }
+        
+        .assistant-message {
+            background-color: #f5f5f5;
+            margin-right: 20%;
+        }
+        
+        .system-message {
+            background-color: #fff8e1;
+            margin: 10px 0;
+            text-align: center;
+            font-style: italic;
+            color: #795548;
+            border-left: 3px solid #ffc107;
+        }
+        
+        .input-container {
+            display: flex;
+            gap: 10px;
+            padding: 10px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: var(--transition);
+        }
+        
+        button:hover {
+            background-color: var(--primary-dark);
+        }
+        
+        .status {
+            text-align: center;
+            color: var(--medium-text);
+            margin-top: 10px;
+            padding: 5px;
+        }
+        
+        .thinking {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 10px;
+            margin-right: 20%;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        
+        .dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--primary-color);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+        
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 左侧区域 - 任务流程看板 -->
+        <div class="task-board">
+            <div class="task-board-header">
+                <h2>任务流程看板</h2>
+            </div>
+            <div class="task-timeline" id="taskTimeline">
+                <!-- 任务节点将通过JavaScript动态添加 -->
+               
+            </div>
+        </div>
+        
+        <!-- 中央区域 - 实时执行面板 -->
+        <div class="execution-panel">
+            <div class="panel-header">
+                <h2>实时执行面板</h2>
+                <div class="container-info">
+                    <span>容器ID: c7a9b3d2</span>
+                </div>
+            </div>
+            
+            <div class="resource-monitor">
+                <div class="resource-item">
+                    <div class="resource-label">CPU使用率</div>
+                    <div class="wave-container">
+                        <div class="wave"></div>
+                    </div>
+                    <div class="resource-value">45%</div>
+                </div>
+                <div class="resource-item">
+                    <div class="resource-label">内存使用率</div>
+                    <div class="wave-container">
+                        <div class="wave"></div>
+                    </div>
+                    <div class="resource-value">62%</div>
+                </div>
+                <div class="resource-item">
+                    <div class="resource-label">网络请求</div>
+                    <div class="resource-value">128/s</div>
+                </div>
+            </div>
+            
+            <div class="tab-container">
+                <div class="tab active">代码执行</div>
+                <div class="tab">数据预览</div>
+                <div class="tab">调试模式</div>
+                <div class="tab">历史记录</div>
+            </div>
+            
+            <div class="execution-content">
+                <div class="code-editor" id="codeEditor">
+                    <pre><code></code></pre>
+                </div>
+            </div>
+            
+            <div class="chat-container" id="chatContainer">
+                <!-- 聊天消息将在这里动态添加 -->
+            </div>
+            
+            <div class="input-container">
+                <input type="text" id="userInput" placeholder="请输入您的问题...">
+                <button onclick="sendMessage()">发送</button>
+            </div>
+            
+            <div class="status" id="status">系统已就绪</div>
+        </div>
+        
+        <!-- 右侧区域 - 结果预览 -->
+        <div class="result-preview">
+            <div class="preview-header">
+                <h2>结果预览</h2>
+            </div>
+            <div class="preview-content">
+                <div class="summary-box">
+                    <div class="summary-title">智能摘要</div>
+                    <div class="summary-content">
+                        检测到3个异常数据点，主要集中在B类别。建议进行数据清洗和重新分析。
+                    </div>
+                </div>
+                
+                <div class="chart-container">
+                    <!-- 图表将通过JavaScript动态添加 -->
+                    <span>折线图展示</span>
+                </div>
+                
+                <div class="file-tree">
+                    <div class="file-item">
+                        <i class="fas fa-file-alt file-icon"></i>
+                        <span>analysis_report.md</span>
+                    </div>
+                    <div class="file-item">
+                        <i class="fas fa-file-csv file-icon"></i>
+                        <span>cleaned_data.csv</span>
+                    </div>
+                    <div class="file-item">
+                        <i class="fas fa-file-excel file-icon"></i>
+                        <span>results.xlsx</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加思考中的HTML模板 -->
+    <template id="thinkingTemplate">
+        <div class="thinking">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <span style="margin-left: 8px">思考中...</span>
+        </div>
+    </template>
+
+    <script>
+        const chatContainer = document.getElementById('chatContainer');
+        const taskContainer = document.getElementById('taskContainer');
+        const logContainer = document.getElementById('logContainer');
+        const userInput = document.getElementById('userInput');
+        const status = document.getElementById('status');
+        const taskTimeline = document.getElementById('taskTimeline');
+
+        // 连接到 Socket.IO
+        const socket = io('/manus');
+
+        async function checkStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                status.textContent = `系统状态: ${data.status}可用工具数= ${data.tools_count}`;
+            } catch (error) {
+                status.textContent = '系统状态检查失败';
+            }
+        }
+
+        // 添加显示和隐藏思考状态的函数
+        function showThinking() {
+            const template = document.getElementById('thinkingTemplate');
+            const thinking = template.content.cloneNode(true);
+            chatContainer.appendChild(thinking);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function hideThinking() {
+            const thinking = chatContainer.querySelector('.thinking');
+            if (thinking) {
+                thinking.remove();
+            }
+        }
+
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            addMessage(message, 'user');
+            userInput.value = '';
+            
+            // 显示思考状态
+            showThinking();
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message })
+                });
+                
+                // 隐藏思考状态
+                hideThinking();
+                
+                const data = await response.json();
+                if (data.status === 'success') {
+                    if (data.response) {
+                        
+                        if (data.response.result) {
+                            addMessage(data.response.result, 'assistant');
+                        }
+                        if (data.response.tasks) {
+                            updateTasks(data.response.tasks);
+                        }
+                        
+                        if (data.response.logs) {
+                            updateLogs(data.response.logs);
+                        }
+                    }
+                } else {
+                    addMessage('抱歉，处理您的请求时出现错误: ' + data.message, 'assistant');
+                }
+            } catch (error) {
+                // 发生错误时也要隐藏思考状态
+                hideThinking();
+                addMessage('抱歉，发送请求时出现错误', 'assistant');
+            }
+        }
+
+        function addMessage(text, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}-message`;
+            messageDiv.textContent = text;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function updateTasks(tasks) {
+            // 更新任务时间轴
+            taskTimeline.innerHTML = '';
+            console.log("tasks"+tasks);
+            if(tasks.length>0){
+                tasks.forEach((task, index) => {
+                    const taskNode = document.createElement('div');
+                    taskNode.className = 'timeline-node';
+                    
+                    let statusIcon, statusClass;
+                    
+                    if (task.completed) {
+                        statusIcon = 'fa-check-circle';
+                        statusClass = 'status-completed';
+                    } else if (task.failed) {
+                        statusIcon = 'fa-exclamation-circle';
+                        statusClass = 'status-failed';
+                    } else {
+                        statusIcon = 'fa-clock';
+                        statusClass = 'status-in-progress';
+                    }
+                    
+                    taskNode.innerHTML = `
+                        <div class="node-status">
+                            <i class="fas ${statusIcon} status-icon ${statusClass}"></i>
+                            <span>${task.name || '任务' + (index + 1)}</span>
+                        </div>
+                        <div class="node-title">${task.description || '任务描述'}</div>
+                        <div class="node-time">${task.completed ? '完成时间: ' + new Date().toLocaleTimeString() : 
+                                            task.failed ? '错误代码: ' + (task.error || 'E1001') : 
+                                            '开始时间: ' + new Date().toLocaleTimeString()}</div>
+                        ${!task.completed && !task.failed ? `
+                        <div class="node-actions">
+                            <button class="action-btn"><i class="fas fa-pause"></i></button>
+                            <button class="action-btn"><i class="fas fa-stop"></i></button>
+                        </div>
+                        ` : ''}
+                    `;
+                })
+                taskTimeline.appendChild(taskNode);
+            }
+        }
+
+        function updateLogs(logs) {
+            // 如果logs是对象而不是数组，将其转换为数组形式
+            if (!Array.isArray(logs)) {
+                let logMessage = '';
+                if (logs.status === 'error') {
+                    logMessage = logs.error || '未知错误';
+                } else {
+                    logMessage = logs.result || JSON.stringify(logs);
+                }
+                logs = [logMessage];
+            }
+
+            const outputLog = document.getElementById('outputLog');
+            
+            logs.forEach(log => {
+                const logDiv = document.createElement('div');
+                logDiv.className = 'log-entry';
+                
+                // 根据日志类型添加不同的样式
+                if (typeof log === 'object' && log.status === 'error') {
+                    logDiv.className += ' log-error';
+                }
+                
+                const logContent = typeof log === 'object' ? 
+                    (log.error || log.result || JSON.stringify(log)) : log;
+                
+                logDiv.innerHTML = `
+                    <span class="log-time">[${new Date().toLocaleTimeString()}]</span>
+                    <span>${logContent}</span>
+                `;
+                outputLog.appendChild(logDiv);
+                outputLog.scrollTop = outputLog.scrollHeight;
+            });
+        }
+
+        userInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // 监听任务列表更新事件
+        socket.on('update_plan_ui', function(data) {
+            updateTasks(data.tasks);
+        });
+
+        // 监听系统消息追加事件
+        socket.on('append_system_message_ui', function(data) {
+            addMessage(data.message, 'system');
+            
+            // 同时在日志容器中显示
+            const outputLog = document.getElementById('outputLog');
+            const logDiv = document.createElement('div');
+            logDiv.className = 'log-entry';
+            logDiv.innerHTML = `
+                <span class="log-time">[${new Date().toLocaleTimeString()}]</span>
+                <span>系统消息: ${data.message}</span>
+            `;
+            outputLog.appendChild(logDiv);
+            outputLog.scrollTop = outputLog.scrollHeight;
+        });
+        
+        // 连接状态处理
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server');
+        });
+
+        // 初始化
+        checkStatus();
+    </script>
+</body>
+</html>

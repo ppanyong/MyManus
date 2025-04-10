@@ -3,11 +3,9 @@ import toml
 from app.agent.manus import ManusAgent
 from app.tool.python_execute import PythonExecuteTool
 from app.tool.google_search import GoogleSearchTool
+from app.tool.baidu_search import BaiduSearchTool
 from app.ui.ui import UI
 from app.tool.calculator import CalculatorTool
-import re
-import json
-import time
 import logging
 from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
@@ -61,7 +59,7 @@ def main():
     
     # 添加工具
     agent.add_tool(PythonExecuteTool(config))
-    agent.add_tool(GoogleSearchTool(config))
+    agent.add_tool(BaiduSearchTool(config))
     # 添加计算器工具
     agent.add_tool(CalculatorTool(config))
 

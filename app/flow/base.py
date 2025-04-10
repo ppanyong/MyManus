@@ -4,6 +4,9 @@ import requests
 from json_repair import repair_json
 import json
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 class BaseFlow(ABC):
     """基础流程框架"""
@@ -138,26 +141,42 @@ class BaseFlow(ABC):
             else:
                 text = str(response)
             
-            # 使用正则表达式匹配 JSON 部分
-            # 匹配 ```json 和 ``` 之间的内容
+            # 首先尝试直接解析整个文本为JSON
+            try:
+                json_data = json.loads(text)
+                if isinstance(json_data, dict) and "steps" in json_data:
+                    return json_data["steps"]
+            except json.JSONDecodeError:
+                pass
+            
+            # 如果直接解析失败，尝试提取JSON部分
             json_pattern = r'```json\s*([\s\S]*?)\s*```'
             json_match = re.search(json_pattern, text)
             
             if json_match:
                 json_str = json_match.group(1).strip()
-                # 解析 JSON 字符串
-                json_data = json.loads(json_str)
-                # 获取步骤列表
-                steps = json_data.get("steps", [])
-                return str(steps)
-            else:
-                # 如果没有找到 JSON 结构，则使用原来的方法解析
-                steps = [step.strip() for step in text.split('\n') 
-                        if step.strip() and not step.startswith('#')]
-                return steps[:20]
+                try:
+                    json_data = json.loads(json_str)
+                    if isinstance(json_data, dict) and "steps" in json_data:
+                        return json_data["steps"]
+                except json.JSONDecodeError:
+                    pass
+            
+            # 如果JSON解析都失败，尝试使用json_repair修复
+            try:
+                repaired_json = repair_json(text)
+                json_data = json.loads(repaired_json)
+                if isinstance(json_data, dict) and "steps" in json_data:
+                    return json_data["steps"]
+            except Exception:
+                pass
+            
+            # 如果所有JSON解析都失败，返回空列表
+            logger.warning("无法解析JSON格式的步骤，返回空列表")
+            return []
             
         except Exception as e:
-            print(f"解析步骤失败: {str(e)}")
+            logger.error(f"解析步骤失败: {str(e)}")
             return []
     
     def format_tools(self, tools: List[Any]) -> List[Dict[str, Any]]:

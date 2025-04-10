@@ -46,7 +46,7 @@ class ReactFlow(BaseFlow):
                 "error": error_msg
             }
     
-    def execute(self, task: Dict[str, Any], tools: List[Any]) -> Dict[str, Any]:
+    async def execute(self, task: Dict[str, Any], tools: List[Any]) -> Dict[str, Any]:
         """
         执行任务，分为thinking和act两个步骤
         
@@ -72,7 +72,7 @@ class ReactFlow(BaseFlow):
                 
             # 2. Act 步骤：执行具体工具
             print("开始执行步骤...")
-            act_result = self._act_step(thinking_result.get("result", []), tools)
+            act_result = await self._act_step(thinking_result.get("result", []), tools)
             
             print(f"执行步骤完成，结果: {act_result.get('result')}")
             
@@ -86,7 +86,6 @@ class ReactFlow(BaseFlow):
                     "act_result": act_result.get("result")
                 }
             }
-        
             
         except Exception as e:
             error_msg = f"执行任务失败: {str(e)}"
@@ -242,7 +241,7 @@ class ReactFlow(BaseFlow):
             return []
         
 
-    def _act_step(self, steps: List[Dict[str, Any]], tools: List[Any]) -> Dict[str, Any]:
+    async def _act_step(self, steps: List[Dict[str, Any]], tools: List[Any]) -> Dict[str, Any]:
         """
         Act 步骤：执行具体工具
         
@@ -255,6 +254,7 @@ class ReactFlow(BaseFlow):
         """
         try:
             results = []
+            step_results = {}  # 存储每个步骤的结果
             
             # 确保 steps 是列表
             if not isinstance(steps, list):
@@ -330,17 +330,31 @@ class ReactFlow(BaseFlow):
                     if not isinstance(params, dict):
                         params = {}
                     
+                    # 处理参数中的步骤结果引用
+                    for key, value in params.items():
+                        if isinstance(value, str) and value.startswith("{step_") and value.endswith("}"):
+                            step_num = int(value[6:-1].split("_")[0])
+                            if step_num in step_results:
+                                params[key] = step_results[step_num]
+                    
                     print(f"调用函数: {tool_name}.{function_name}，参数: {params}")
                     
                     # 调用函数
                     function = getattr(tool, function_name)
                     result = function(**params)
                     
+                    # 如果是协程，等待执行
+                    if hasattr(result, "__await__"):
+                        result = await result
+                    
                     print(f"函数调用成功，结果: {result}")
+                    
+                    # 存储步骤结果
+                    step_results[i + 1] = result
                     
                     results.append({
                         "status": "success",
-                        "result": result,
+                        "result": result.get("result") if isinstance(result, dict) else result,
                         "error": None
                     })
                     
@@ -355,10 +369,15 @@ class ReactFlow(BaseFlow):
             
             print(f"所有步骤执行完成，结果: {results}")
             
-            return {
-                "status": "success",
-                "result": results
-            }
+            # 简化返回结果结构
+            if len(results) == 1:
+                return results[0]
+            else:
+                return {
+                    "status": "success",
+                    "result": results,
+                    "error": None
+                }
             
         except Exception as e:
             error_msg = f"执行步骤失败: {str(e)}"
