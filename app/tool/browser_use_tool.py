@@ -183,6 +183,10 @@ class BrowserUseTool(BaseTool, Generic[Context]):
                         if not isinstance(value, list) or value:
                             browser_config_kwargs[attr] = value
 
+            # 设置窗口大小
+            if hasattr(config.browser_config, "window_size"):
+                browser_config_kwargs["window_size"] = config.browser_config.window_size
+
             self.browser = BrowserUseBrowser(BrowserConfig(**browser_config_kwargs))
 
         if self.context is None:

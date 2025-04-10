@@ -177,9 +177,20 @@ class UI:
             return
             
         try:
+            # 清理数据，移除可能的循环引用
+            cleaned_plan = []
+            for task in plan:
+                cleaned_task = {
+                    "id": task.get("id"),
+                    "description": task.get("description"),
+                    "completed": task.get("completed", False),
+                    "error": task.get("error")
+                }
+                cleaned_plan.append(cleaned_task)
+            
             # 发送计划更新到UI
             self.socketio.emit('update_plan_ui', {
-                'plan': plan
+                'tasks': cleaned_plan
             }, namespace='/manus')
         except Exception as e:
             print(f"发送计划更新失败: {str(e)}")

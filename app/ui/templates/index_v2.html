@@ -645,6 +645,22 @@
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
+        // 添加防抖函数
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // 使用防抖包装updateTasks函数
+        const debouncedUpdateTasks = debounce(updateTasks, 100);
+
         function updateTasks(tasks) {
             // 更新任务时间轴
             taskTimeline.innerHTML = '';
@@ -731,7 +747,7 @@
 
         // 监听任务列表更新事件
         socket.on('update_plan_ui', function(data) {
-            updateTasks(data.tasks);
+            debouncedUpdateTasks(data.tasks);
         });
 
         // 监听系统消息追加事件

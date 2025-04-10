@@ -198,43 +198,43 @@ class ManusAgent(ToolCallAgent):
                 
                 # 更新任务状态和结果
                 if step_result.get("status") == "success":
+                    # 只存储必要的信息
                     tasks[i].update({
-                        "result": result_copy.get("result"),
-                        "task_info": step_result.get("task_info"),
-                        "completed": True
+                        "completed": True,
+                        "status": "success"
                     })
                     
-                    # 将结果添加到上下文，避免存储整个对象
+                    # 将结果添加到上下文，只存储必要的信息
                     self.add_memory({
                         "type": "step_result",
                         "step": i + 1,
                         "task": task.get("description", "未知任务"),
-                        "result": result_copy.get("result"),
-                        "task_info": step_result.get("task_info")
+                        "status": "success"
                     })
                     
                     # 打印详细的结果信息
                     self._append_system_message(f"系统: 步骤 {i+1} 执行成功")
                     if step_result.get("result"):
                         try:
-                            result_str = json.dumps(step_result.get("result"), ensure_ascii=False)
+                            # 尝试将结果转换为字符串
+                            result_str = str(step_result.get("result"))
                             self._append_system_message(f"系统: 步骤 {i+1} 结果: {result_str}")
                         except Exception as e:
                             self._append_system_message(f"系统: 步骤 {i+1} 结果无法序列化: {str(e)}")
                 else:
                     tasks[i].update({
                         "completed": False,
+                        "status": "error",
                         "error": step_result.get("error")
                     })
                     
                     # 打印错误信息
                     self._append_system_message(f"系统: 步骤 {i+1} 执行失败: {step_result.get('error')}")
                 
-                # 存储执行结果，避免存储整个对象
+                # 存储执行结果，只存储必要的信息
                 self.memory.append({
                     "step": i + 1,
                     "task": task.get("description", "未知任务"),
-                    "result": result_copy.get("result"),
                     "status": result_copy.get("status"),
                     "error": result_copy.get("error")
                 })
@@ -242,7 +242,10 @@ class ManusAgent(ToolCallAgent):
                 # 更新UI
                 if self.ui:
                     try:
-                        self.ui.update_plan_ui(tasks)
+                        # 只在任务状态发生变化时更新UI
+                        if tasks[i].get("completed") != task.get("completed") or \
+                           tasks[i].get("error") != task.get("error"):
+                            self.ui.update_plan_ui(tasks)
                     except Exception as e:
                         print(f"更新任务列表失败: {str(e)}")
                 

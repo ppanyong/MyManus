@@ -1,4 +1,3 @@
-
 # 超时设置
 [timeout]
 default = 30  # 默认超时时间（秒）
@@ -27,4 +26,10 @@ stream = false
 [server]
 host = "127.0.0.1"
 port = 3344
-debug = true 
+debug = true
+
+# 浏览器配置
+[browser]
+headless = false  # 是否使用无头模式
+max_content_length = 2000  # 最大内容长度
+window_size = { width = 1920, height = 1080 }  # 浏览器窗口大小 
