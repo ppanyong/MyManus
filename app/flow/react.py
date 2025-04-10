@@ -76,6 +76,7 @@ class ReactFlow(BaseFlow):
             
             print(f"执行步骤完成，结果: {act_result.get('result')}")
             
+            
             # 3. 合并结果
             return {
                 "status": "success",
@@ -367,7 +368,7 @@ class ReactFlow(BaseFlow):
                         "error": error_msg
                     })
             
-            print(f"所有步骤执行完成，结果: {results}")
+            print(f"当前act_step 步骤执行完成，结果: {results}")
             
             # 简化返回结果结构
             if len(results) == 1:

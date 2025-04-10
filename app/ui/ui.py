@@ -236,17 +236,17 @@ class UI:
             }, namespace='/manus')
             
             # 添加系统消息，提示任务执行完成
-            self.append_system_message_ui("系统: 所有任务执行完成！")
+            # self.append_system_message_ui("系统: 所有任务执行完成！")
             
             # 添加最终结果摘要
-            result_summary = "系统: 执行结果摘要:\n"
+            result_summary = "系统: 所有任务执行完成，执行结果摘要:"
             for item in processed_memory:
                 if item.get("type") == "step_result":
                     step = item.get("step", "未知步骤")
                     result = item.get("result", "无结果")
                     if isinstance(result, dict):
                         result = result.get("result", result)
-                    result_summary += f"- 步骤 {step}: {result}\n"
+                    result_summary += f" 最终结果为 {result}\n"
             
             self.append_system_message_ui(result_summary)
             

@@ -165,6 +165,16 @@ class ManusAgent(ToolCallAgent):
             # 5. 开始异步执行任务链
             await self._execute_task_chain(tasks)
             
+            # 从 memory 中获取执行结果
+            if self.memory:
+                # 获取最后一个记忆项
+                last_memory = self.memory[-1]
+                if last_memory.get("status") == "success":
+                    response["result"] = last_memory.get("result", "任务执行完成")
+                else:
+                    response["result"] = f"任务执行失败: {last_memory.get('error', '未知错误')}"
+                    response["status"] = "error"
+
             return response
             
         except Exception as e:
@@ -236,7 +246,8 @@ class ManusAgent(ToolCallAgent):
                     "step": i + 1,
                     "task": task.get("description", "未知任务"),
                     "status": result_copy.get("status"),
-                    "error": result_copy.get("error")
+                    "error": result_copy.get("error"),
+                    "result": result_copy.get("result")
                 })
                 
                 # 更新UI
