@@ -38,3 +38,5 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db 
+search_page.html
+app/agent/__pycache__/manus.cpython-313.pyc

@@ -60,13 +60,27 @@ class ReactFlow(BaseFlow):
         try:
             # 打印任务信息
             print(f"开始执行任务: {task.get('description', '未知任务')}")
-            
+            # 从task中获取上一步的结果
+            previous_result = task.get("previous_result")
+            if previous_result:
+                print(f"获取到上一步执行结果: {previous_result}")
+            else:
+                print("未找到上一步执行结果")
+                
             # 1. Thinking 步骤：分析任务并生成执行计划
             print("开始思考步骤...")
             thinking_result = self._thinking_step(task, tools)
             if thinking_result.get("status") == "error":
                 print(f"思考步骤失败: {thinking_result.get('error')}")
-                return thinking_result
+                return {
+                    "status": "error",
+                    "error": thinking_result.get("error"),
+                    "task_info": {
+                        "task": task,
+                        "thinking_result": None,
+                        "act_result": None
+                    }
+                }
                 
             print(f"思考步骤完成，生成执行计划: {thinking_result.get('result')}")
                 
@@ -76,8 +90,31 @@ class ReactFlow(BaseFlow):
             
             print(f"执行步骤完成，结果: {act_result.get('result')}")
             
-            
             # 3. 合并结果
+            # 如果任何步骤执行失败，整个任务就失败
+            if isinstance(act_result.get("result"), list):
+                for step_result in act_result["result"]:
+                    if step_result.get("status") == "error":
+                        return {
+                            "status": "error",
+                            "error": step_result.get("error"),
+                            "task_info": {
+                                "task": task,
+                                "thinking_result": thinking_result.get("result"),
+                                "act_result": act_result.get("result")
+                            }
+                        }
+            elif act_result.get("status") == "error":
+                return {
+                    "status": "error",
+                    "error": act_result.get("error"),
+                    "task_info": {
+                        "task": task,
+                        "thinking_result": thinking_result.get("result"),
+                        "act_result": [act_result]
+                    }
+                }
+            
             return {
                 "status": "success",
                 "result": act_result.get("result"),
@@ -93,8 +130,12 @@ class ReactFlow(BaseFlow):
             print(error_msg)
             return {
                 "status": "error",
-                "result": None,
-                "error": error_msg
+                "error": error_msg,
+                "task_info": {
+                    "task": task,
+                    "thinking_result": None,
+                    "act_result": None
+                }
             }
     
     def _thinking_step(self, task: Dict[str, Any], tools: List[Any]) -> Dict[str, Any]:
@@ -149,6 +190,9 @@ class ReactFlow(BaseFlow):
             # 解析响应
             content = super()._parse_steps(response.get("result", {}))
             
+            # 初始化步骤结果字典
+            step_results = {}
+            
             # 如果content是字符串，尝试解析为JSON
             if isinstance(content, str):
                 try:
@@ -183,7 +227,33 @@ class ReactFlow(BaseFlow):
                 # 如果不是字典也不是列表，返回空列表
                 steps = []
 
-            
+            # 处理步骤参数
+            for step in steps:
+                if isinstance(step, dict) and "parameters" in step:
+                    # 确保parameters是字典类型
+                    if not isinstance(step["parameters"], dict):
+                        step["parameters"] = {}
+                    # 处理参数中的步骤结果引用
+                    for key, value in step["parameters"].items():
+                        if isinstance(value, str) and value.startswith("{step_") and value.endswith("}"):
+                            step_num = int(value[6:-1].split("_")[0])
+                            if step_num in step_results:
+                                # 获取步骤结果
+                                step_result = step_results[step_num]
+                                # 如果结果是字典且包含results字段，则使用results字段的值
+                                if isinstance(step_result, dict):
+                                    if "results" in step_result and step_result["results"]:
+                                        step["parameters"][key] = str(step_result["results"][0].get("title", ""))
+                                    elif "result" in step_result:
+                                        step["parameters"][key] = str(step_result["result"])
+                                    else:
+                                        step["parameters"][key] = str(step_result)
+                                else:
+                                    step["parameters"][key] = str(step_result)
+                            else:
+                                # 如果步骤结果不存在，保留原始值
+                                step["parameters"][key] = value
+
             return {
                 "status": "success",
                 "result": steps
@@ -336,12 +406,40 @@ class ReactFlow(BaseFlow):
                         if isinstance(value, str) and value.startswith("{step_") and value.endswith("}"):
                             step_num = int(value[6:-1].split("_")[0])
                             if step_num in step_results:
-                                params[key] = step_results[step_num]
+                                # 获取步骤结果
+                                step_result = step_results[step_num]
+                                # 如果结果是字典且包含results字段，则使用results字段的值
+                                if isinstance(step_result, dict):
+                                    if "results" in step_result and step_result["results"]:
+                                        params[key] = str(step_result["results"][0].get("title", ""))
+                                    elif "result" in step_result:
+                                        params[key] = str(step_result["result"])
+                                    else:
+                                        params[key] = str(step_result)
+                                else:
+                                    params[key] = str(step_result)
+                            else:
+                                # 如果步骤结果不存在，保留原始值
+                                params[key] = value
+                    
+                    # 验证参数
+                    function = getattr(tool, function_name)
+                    if hasattr(function, "__annotations__"):
+                        required_params = {k: v for k, v in function.__annotations__.items() 
+                                        if k != 'return' and k not in params}
+                        if required_params:
+                            error_msg = f"缺少必要参数: {', '.join(required_params.keys())}"
+                            print(error_msg)
+                            results.append({
+                                "status": "error",
+                                "result": None,
+                                "error": error_msg
+                            })
+                            continue
                     
                     print(f"调用函数: {tool_name}.{function_name}，参数: {params}")
                     
                     # 调用函数
-                    function = getattr(tool, function_name)
                     result = function(**params)
                     
                     # 如果是协程，等待执行
@@ -353,9 +451,26 @@ class ReactFlow(BaseFlow):
                     # 存储步骤结果
                     step_results[i + 1] = result
                     
+                    # 检查结果状态
+                    if isinstance(result, dict):
+                        if result.get("status") == "error":
+                            results.append({
+                                "status": "error",
+                                "result": None,
+                                "error": result.get("error", "未知错误")
+                            })
+                            continue
+                        elif result.get("status") == "success":
+                            results.append({
+                                "status": "success",
+                                "result": result.get("results") if "results" in result else result.get("result"),
+                                "error": None
+                            })
+                            continue
+                    
                     results.append({
                         "status": "success",
-                        "result": result.get("result") if isinstance(result, dict) else result,
+                        "result": result,
                         "error": None
                     })
                     
@@ -370,7 +485,16 @@ class ReactFlow(BaseFlow):
             
             print(f"当前act_step 步骤执行完成，结果: {results}")
             
-            # 简化返回结果结构
+            # 检查是否有任何步骤失败
+            for result in results:
+                if result.get("status") == "error":
+                    return {
+                        "status": "error",
+                        "result": results,
+                        "error": result.get("error")
+                    }
+            
+            # 如果所有步骤都成功
             if len(results) == 1:
                 return results[0]
             else:

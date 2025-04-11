@@ -172,7 +172,7 @@ class BaseFlow(ABC):
                 pass
             
             # 如果所有JSON解析都失败，返回空列表
-            logger.warning("无法解析JSON格式的步骤，返回空列表")
+            logger.warning(f"无法解析JSON格式的步骤，返回空列表。原文text: {text}")
             return []
             
         except Exception as e:

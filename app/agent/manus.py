@@ -200,6 +200,12 @@ class ManusAgent(ToolCallAgent):
                 # 更新当前任务索引
                 self.current_task_index = i
                 
+                # 获取上一步的结果
+                if i > 0 and self.memory:
+                    previous_result = self.memory[-1].get("result")
+                    if previous_result:
+                        task["previous_result"] = previous_result
+                
                 # 执行任务
                 step_result = await self.react_flow.execute(task, self.tools)
                 

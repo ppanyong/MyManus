@@ -1,6 +1,7 @@
 import os
 import toml
 from app.agent.manus import ManusAgent
+from app.tool.file_manager import FileManager
 from app.tool.python_execute import PythonExecuteTool
 from app.tool.google_search import GoogleSearchTool
 from app.tool.baidu_search import BaiduSearchTool
@@ -58,11 +59,11 @@ def main():
     agent = ManusAgent(config)
     
     # 添加工具
+    agent.add_tool(CalculatorTool(config))  # 先添加计算器工具
     agent.add_tool(PythonExecuteTool(config))
     agent.add_tool(BaiduSearchTool(config))
-    # 添加计算器工具
-    agent.add_tool(CalculatorTool(config))
-
+    agent.add_tool(FileManager(config))
+    
     # 初始化智能体
     agent.initialize()
     

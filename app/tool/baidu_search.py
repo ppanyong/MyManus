@@ -443,7 +443,7 @@ class BaiduSearchTool:
                                 "default": 5
                             }
                         },
-                        "required": ["query"]
+                        "required": ["query", "max_results"]
                     },
                     "returns": {
                         "type": "object",
