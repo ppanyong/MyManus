@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MyManus AI Assistant</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         body {
             font-family: 'Microsoft YaHei', sans-serif;
@@ -203,9 +204,94 @@
         
         .browser-content {
             flex: 1;
-            overflow: hidden;
+            overflow-y: auto;
+            padding: 20px;
             width: 100%;
             box-sizing: border-box;
+        }
+        
+        /* Markdown 样式 */
+        .markdown-content {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+        }
+        
+        .markdown-content h1,
+        .markdown-content h2,
+        .markdown-content h3,
+        .markdown-content h4,
+        .markdown-content h5,
+        .markdown-content h6 {
+            margin-top: 24px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+        
+        .markdown-content p {
+            margin-top: 0;
+            margin-bottom: 16px;
+        }
+        
+        .markdown-content code {
+            padding: 0.2em 0.4em;
+            margin: 0;
+            font-size: 85%;
+            background-color: rgba(27,31,35,0.05);
+            border-radius: 3px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        }
+        
+        .markdown-content pre {
+            padding: 16px;
+            overflow: auto;
+            font-size: 85%;
+            line-height: 1.45;
+            background-color: #f6f8fa;
+            border-radius: 3px;
+        }
+        
+        .markdown-content blockquote {
+            padding: 0 1em;
+            color: #6a737d;
+            border-left: 0.25em solid #dfe2e5;
+            margin: 0 0 16px 0;
+        }
+        
+        .markdown-content ul,
+        .markdown-content ol {
+            padding-left: 2em;
+            margin-top: 0;
+            margin-bottom: 16px;
+        }
+        
+        .markdown-content table {
+            display: block;
+            width: 100%;
+            overflow: auto;
+            margin-top: 0;
+            margin-bottom: 16px;
+            border-spacing: 0;
+            border-collapse: collapse;
+        }
+        
+        .markdown-content table th {
+            font-weight: 600;
+        }
+        
+        .markdown-content table th,
+        .markdown-content table td {
+            padding: 6px 13px;
+            border: 1px solid #dfe2e5;
+        }
+        
+        .markdown-content table tr {
+            background-color: #fff;
+            border-top: 1px solid #c6cbd1;
+        }
+        
+        .markdown-content table tr:nth-child(2n) {
+            background-color: #f6f8fa;
         }
         
         .browser-iframe {
@@ -300,13 +386,13 @@
                 <!-- 任务列表将在这里动态添加 -->
             </div>
             
-            <h2>浏览器视图</h2>
+            <h2>任务结果</h2>
             <div class="browser-container">
                 <div class="browser-header">
-                    <span>浏览器视图</span>
+                    <span>任务执行结果</span>
                 </div>
-                <div class="browser-content">
-                    <iframe id="browserFrame" class="browser-iframe" src="about:blank"></iframe>
+                <div class="browser-content" id="resultContent">
+                    <!-- 任务结果将在这里动态添加 -->
                 </div>
             </div>
         </div>
@@ -524,6 +610,25 @@
         socket.on('update_browser_view', function(data) {
             if (data.url) {
                 updateBrowserView(data.url);
+            }
+        });
+
+        // 添加更新任务结果的函数
+        function updateTaskResult(content) {
+            const resultContent = document.getElementById('resultContent');
+            if (content) {
+                // 使用 marked 解析 Markdown
+                const htmlContent = marked.parse(content);
+                resultContent.innerHTML = `<div class="markdown-content">${htmlContent}</div>`;
+            } else {
+                resultContent.innerHTML = '';
+            }
+        }
+        
+        // 修改socket监听，添加任务结果更新
+        socket.on('update_task_result', function(data) {
+            if (data.content) {
+                updateTaskResult(data.content);
             }
         });
 

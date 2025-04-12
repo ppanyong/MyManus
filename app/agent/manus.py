@@ -263,6 +263,26 @@ class ManusAgent(ToolCallAgent):
                         if tasks[i].get("completed") != task.get("completed") or \
                            tasks[i].get("error") != task.get("error"):
                             self.ui.update_plan_ui(tasks)
+                            
+                        # 更新任务结果
+                        if i == len(tasks) - 1:  # 如果是最后一个任务
+                            # 将结果转换为markdown格式
+                            markdown_result = "## 任务执行结果\n\n"
+                            for memory_item in self.memory:
+                                if memory_item.get("type") == "step_result":
+                                    step = memory_item.get("step", "未知步骤")
+                                    task_desc = memory_item.get("task", "未知任务")
+                                    status = memory_item.get("status", "未知状态")
+                                    result = memory_item.get("result", "无结果")
+                                    
+                                    markdown_result += f"### 步骤 {step}: {task_desc}\n"
+                                    markdown_result += f"- 状态: {status}\n"
+                                    if isinstance(result, dict):
+                                        result = result.get("result", result)
+                                    markdown_result += f"- 结果: {result}\n\n"
+                            
+                            # 更新结果UI
+                            self._update_result_ui(markdown_result)
                     except Exception as e:
                         print(f"更新任务列表失败: {str(e)}")
                 
