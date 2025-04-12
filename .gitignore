@@ -41,3 +41,11 @@ Thumbs.db
 search_page.html
 app/agent/__pycache__/manus.cpython-313.pyc
 config/config.toml
+
+# Screenshots
+screenshots/
+screenshots/search/
+screenshots/search/*.jpg
+
+#config
+config/config.toml

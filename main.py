@@ -2,6 +2,7 @@ import os
 import toml
 from app.agent.manus import ManusAgent
 from app.tool.file_manager import FileManager
+from app.tool.html_parser_tool import HTMLParserTool
 from app.tool.python_execute import PythonExecuteTool
 from app.tool.google_search import GoogleSearchTool
 from app.tool.baidu_search import BaiduSearchTool
@@ -63,6 +64,7 @@ def main():
     agent.add_tool(PythonExecuteTool(config))
     agent.add_tool(BaiduSearchTool(config))
     agent.add_tool(FileManager(config))
+    agent.add_tool(HTMLParserTool(config))
     
     # 初始化智能体
     agent.initialize()

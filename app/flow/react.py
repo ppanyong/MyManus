@@ -243,13 +243,14 @@ class ReactFlow(BaseFlow):
                                 # 如果结果是字典且包含results字段，则使用results字段的值
                                 if isinstance(step_result, dict):
                                     if "results" in step_result and step_result["results"]:
-                                        step["parameters"][key] = str(step_result["results"][0].get("title", ""))
+                                        # 如果是搜索结果，直接使用整个结果列表
+                                        step["parameters"][key] = step_result["results"]
                                     elif "result" in step_result:
-                                        step["parameters"][key] = str(step_result["result"])
+                                        step["parameters"][key] = step_result["result"]
                                     else:
-                                        step["parameters"][key] = str(step_result)
+                                        step["parameters"][key] = step_result
                                 else:
-                                    step["parameters"][key] = str(step_result)
+                                    step["parameters"][key] = step_result
                             else:
                                 # 如果步骤结果不存在，保留原始值
                                 step["parameters"][key] = value

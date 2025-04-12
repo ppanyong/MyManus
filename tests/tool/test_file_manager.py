@@ -2,7 +2,17 @@ import unittest
 import os
 import tempfile
 import shutil
-from app.tool.file_manager import FileManager
+import sys
+print("开始执行测试文件")
+print("当前工作目录:", os.getcwd())
+print("Python路径:", sys.path)
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+print("添加后的Python路径:", sys.path)
+try:
+    from app.tool.file_manager import FileManager
+    print("成功导入 FileManager")
+except Exception as e:
+    print("导入 FileManager 失败:", str(e))
 
 class TestFileManager(unittest.TestCase):
     """文件管理工具测试类"""

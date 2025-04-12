@@ -9,4 +9,8 @@ flask[async]==3.0.2
 json_repair
 bs4
 hypercorn==0.15.0
-playwright==1.41.0
+playwright==1.42.0
+beautifulsoup4==4.12.3
+jieba==0.42.1
+numpy==1.26.4
+scikit-learn==1.4.1.post1

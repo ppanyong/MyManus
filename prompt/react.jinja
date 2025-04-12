@@ -17,7 +17,7 @@
 上一步任务结果： {% if task %}{{task.previous_result}}{% endif %} ,如果有上一步任务结果，那么上一步任务结果是最重要的任务参数。
 任务描述：{% if task %}{{task.description}}{% endif %}
 任务目标：{% if task %}{{task.purpose}}{% endif %}
-任务参数:{% if task %}{{task.parameters}}{% endif %}
+任务参数:{% if task %}{% if task.previous_result %}{{task.previous_result}}{% else %}{{task.parameters}}{% endif %}{% endif %}
 
 {% set memory_info = "" %}
 {% if memory %}
