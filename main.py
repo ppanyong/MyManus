@@ -18,7 +18,7 @@ logger = logger_tool.get_logger(__name__)
 
 def load_config() -> dict:
     """加载配置文件"""
-    config_path = os.path.join(os.path.dirname(__file__), 'config', 'config.toml')
+    config_path = os.path.join(os.path.dirname(__file__), 'config', 'myconfig.toml')
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
             return toml.load(f)
