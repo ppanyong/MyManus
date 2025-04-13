@@ -1,8 +1,10 @@
 import os
 from typing import Dict, Any, Optional
-import logging
+from app.tool.logger_tool import LoggerTool
 
-logger = logging.getLogger(__name__)
+# 初始化日志工具
+logger_tool = LoggerTool()
+logger = logger_tool.get_logger("FileManager")
 
 class FileManager:
     """文件管理工具类"""
@@ -15,10 +17,12 @@ class FileManager:
         """
         self.config = config or {}
         self.base_dir = self.config.get('base_dir', '')
+        logger.info(f"初始化FileManager，配置: {config}")
     
     @staticmethod
     def get_tool_description() -> Dict[str, Any]:
         """获取工具描述"""
+        logger.info("获取工具描述")
         return {
             "name": "FileManager",
             "description": "文件管理工具，用于创建、读取、写入和删除文件",
@@ -94,12 +98,15 @@ class FileManager:
         """
         try:
             full_path = self._get_full_path(filename)
+            logger.info(f"尝试创建文件: {full_path}")
             
             # 检查文件是否已存在
             if os.path.exists(full_path):
+                error_msg = f"文件已存在: {full_path}"
+                logger.warning(error_msg)
                 return {
                     "status": "error",
-                    "error": f"文件已存在: {full_path}"
+                    "error": error_msg
                 }
             
             # 确保目录存在
@@ -109,15 +116,17 @@ class FileManager:
             with open(full_path, 'w', encoding='utf-8') as f:
                 pass
                 
+            logger.info(f"文件创建成功: {full_path}")
             return {
                 "status": "success",
                 "message": f"文件创建成功: {full_path}"
             }
         except Exception as e:
-            logger.error(f"创建文件失败: {str(e)}")
+            error_msg = f"创建文件失败: {str(e)}"
+            logger.error(error_msg)
             return {
                 "status": "error",
-                "error": str(e)
+                "error": error_msg
             }
     
     def read_file(self, filename: str) -> Dict[str, Any]:
@@ -131,25 +140,30 @@ class FileManager:
         """
         try:
             full_path = self._get_full_path(filename)
+            logger.info(f"尝试读取文件: {full_path}")
             
             if not os.path.exists(full_path):
+                error_msg = f"文件不存在: {full_path}"
+                logger.warning(error_msg)
                 return {
                     "status": "error",
-                    "error": f"文件不存在: {full_path}"
+                    "error": error_msg
                 }
                 
             with open(full_path, 'r', encoding='utf-8') as f:
                 content = f.read()
                 
+            logger.info(f"文件读取成功: {full_path}")
             return {
                 "status": "success",
                 "content": content
             }
         except Exception as e:
-            logger.error(f"读取文件失败: {str(e)}")
+            error_msg = f"读取文件失败: {str(e)}"
+            logger.error(error_msg)
             return {
                 "status": "error",
-                "error": str(e)
+                "error": error_msg
             }
     
     def write_file(self, filename: str, content: str) -> Dict[str, Any]:
@@ -164,6 +178,7 @@ class FileManager:
         """
         try:
             full_path = self._get_full_path(filename)
+            logger.info(f"尝试写入文件: {full_path}")
             
             # 确保目录存在
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
@@ -171,15 +186,17 @@ class FileManager:
             with open(full_path, 'w', encoding='utf-8') as f:
                 f.write(content)
                 
+            logger.info(f"文件写入成功: {full_path}")
             return {
                 "status": "success",
                 "message": f"文件写入成功: {full_path}"
             }
         except Exception as e:
-            logger.error(f"写入文件失败: {str(e)}")
+            error_msg = f"写入文件失败: {str(e)}"
+            logger.error(error_msg)
             return {
                 "status": "error",
-                "error": str(e)
+                "error": error_msg
             }
     
     def delete_file(self, filename: str) -> Dict[str, Any]:
@@ -193,21 +210,26 @@ class FileManager:
         """
         try:
             full_path = self._get_full_path(filename)
+            logger.info(f"尝试删除文件: {full_path}")
             
             if not os.path.exists(full_path):
+                error_msg = f"文件不存在: {full_path}"
+                logger.warning(error_msg)
                 return {
                     "status": "error",
-                    "error": f"文件不存在: {full_path}"
+                    "error": error_msg
                 }
                 
             os.remove(full_path)
+            logger.info(f"文件删除成功: {full_path}")
             return {
                 "status": "success",
                 "message": f"文件删除成功: {full_path}"
             }
         except Exception as e:
-            logger.error(f"删除文件失败: {str(e)}")
+            error_msg = f"删除文件失败: {str(e)}"
+            logger.error(error_msg)
             return {
                 "status": "error",
-                "error": str(e)
+                "error": error_msg
             } 

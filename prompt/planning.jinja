@@ -20,7 +20,7 @@
 - 包含每个步骤的详细说明
 - 标注关键依赖关系
 
-用户任务: {{ task }}
+**用户任务: {{ task }}**
 
 如果用户任务内容无法理解，或者任务过于简单无需分解，则返回一个一步任务，显示无需分解请重新提问
 
@@ -53,26 +53,27 @@
     "steps": [
         {
             "step_id": 1,
-            "purpose": "计算两个数字的和",
-            "description": "使用Calculator.add执行计算1+1",
+            "purpose": "任务目标，如：计算两个数字的和",
+            "description": "任务描述，如：使用Calculator.add执行计算1+1",
             "parameters": {
                 "a": 1,
                 "b": 1
             },
             "dependencies": [],
-            "expected_output": "计算结果（数字类型）"
+            "expected_output": "任务结果，如：计算结果（数字类型）"
         },
         {
             "step_id": 2,
-            "purpose": "将计算结果保存到文件",
-            "description": "使用FileManager.write执行将结果写入到文件",
+            "purpose": "任务目标，如：将计算结果保存到文件",
+            "description": "任务描述，如：使用FileManager.write执行将结果写入到文件",
             "parameters": {
                 "filename": "result.txt",
                 "content": "{step_1_result}"
             },
             "dependencies": ["step_1"],
-            "expected_output": "文件写入成功的确认信息"
+            "expected_output": "任务结果，如：文件写入成功的确认信息"
         }
     ]
 }
+以上是JSON格式响应示例。
 请开始生成规划流程

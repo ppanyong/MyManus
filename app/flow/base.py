@@ -4,9 +4,11 @@ import requests
 from json_repair import repair_json
 import json
 import re
-import logging
+from app.tool.logger_tool import LoggerTool
 
-logger = logging.getLogger(__name__)
+# 初始化日志工具
+logger_tool = LoggerTool()
+logger = logger_tool.get_logger("BaseFlow")
 
 class BaseFlow(ABC):
     """基础流程框架"""
@@ -14,6 +16,7 @@ class BaseFlow(ABC):
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.steps = []
+        logger.info(f"初始化BaseFlow，配置: {config}")
         
     @abstractmethod
     def initialize(self):
@@ -113,7 +116,7 @@ class BaseFlow(ABC):
             repaired_json = repair_json(response_text)
             return json.loads(repaired_json)
         except Exception as e:
-            print(f"JSON解析失败: {str(e)}")
+            logger.error(f"JSON解析失败: {str(e)}")
             return {
                 "status": "error",
                 "result": response_text,
@@ -201,7 +204,7 @@ class BaseFlow(ABC):
                     "type": "function"
                 })
             except Exception as e:
-                print(f"获取工具描述失败: {str(e)}")
+                logger.error(f"获取工具描述失败: {str(e)}")
                 continue
         return formatted_tools
     

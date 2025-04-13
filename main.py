@@ -6,40 +6,15 @@ from app.tool.html_parser_tool import HTMLParserTool
 from app.tool.python_execute import PythonExecuteTool
 from app.tool.google_search import GoogleSearchTool
 from app.tool.baidu_search import BaiduSearchTool
+from app.tool.time_tool import TimeTool
 from app.ui.ui import UI
 from app.tool.calculator import CalculatorTool
+from app.tool.logger_tool import LoggerTool
 import logging
-from datetime import datetime
-from logging.handlers import TimedRotatingFileHandler
 
-# 配置日志记录器
-logger = logging.getLogger(__name__)
-
-# 创建日志目录
-log_dir = os.path.join("logs", "manus")
-os.makedirs(log_dir, exist_ok=True)
-
-# 配置日志文件路径
-log_file = os.path.join(log_dir, "manus.log")
-
-# 创建 TimedRotatingFileHandler，按天轮转日志文件
-file_handler = TimedRotatingFileHandler(
-    log_file,
-    when="midnight",
-    interval=1,
-    backupCount=30,  # 保留30天的日志
-    encoding="utf-8"
-)
-
-# 设置日志格式
-formatter = logging.Formatter(
-    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-file_handler.setFormatter(formatter)
-
-# 添加文件处理器到日志记录器
-logger.addHandler(file_handler)
-logger.setLevel(logging.INFO)
+# 初始化日志工具
+logger_tool = LoggerTool(log_dir=os.path.join("logs", "manus"))
+logger = logger_tool.get_logger(__name__)
 
 def load_config() -> dict:
     """加载配置文件"""
@@ -48,7 +23,7 @@ def load_config() -> dict:
         with open(config_path, 'r', encoding='utf-8') as f:
             return toml.load(f)
     except Exception as e:
-        print(f"加载配置文件失败: {str(e)}")
+        logger.error(f"加载配置文件失败: {str(e)}")
         return {}
 
 def main():
@@ -58,13 +33,14 @@ def main():
     
     # 初始化主智能体
     agent = ManusAgent(config)
-    
+    logger.info(f"初始化主智能体: {agent}")
     # 添加工具
     agent.add_tool(CalculatorTool(config))  # 先添加计算器工具
     agent.add_tool(PythonExecuteTool(config))
     agent.add_tool(BaiduSearchTool(config))
     agent.add_tool(FileManager(config))
     agent.add_tool(HTMLParserTool(config))
+    agent.add_tool(TimeTool(config))
     
     # 初始化智能体
     agent.initialize()

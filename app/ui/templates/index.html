@@ -50,29 +50,38 @@
         }
         .message {
             margin-bottom: 10px;
-            padding: 10px;
-            border-radius: 5px;
+            padding: 10px 15px;
+            border-radius: 15px;
             word-break: break-word;
-            max-width: 100%;
+            max-width: 80%;
             box-sizing: border-box;
+            position: relative;
+            font-size: 14px;
+            line-height: 1.4;
         }
         .user-message {
-            background-color: #e3f2fd;
-            margin-left: 10%;
+            background-color: #95ec69;
+            margin-left: auto;
             margin-right: 0;
+            border-top-right-radius: 0;
         }
         .assistant-message {
-            background-color: #f5f5f5;
-            margin-right: 10%;
+            background-color: #ffffff;
+            margin-right: auto;
             margin-left: 0;
+            border-top-left-radius: 0;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
         .system-message {
-            background-color: #fff8e1;
-            margin: 10px 0;
-            text-align: center;
-            font-style: italic;
-            color: #795548;
-            border-left: 3px solid #ffc107;
+            background-color: #f0f0f0;
+            margin: 5px auto;
+            text-align: left;
+            font-style: normal;
+            color: #666;
+            border: none;
+            max-width: 90%;
+            font-size: 12px;
+            position: relative;
         }
         .input-container {
             display: flex;
@@ -116,207 +125,66 @@
             height: 18px;
         }
         .log-entry {
-            margin-bottom: 5px;
-            padding: 5px;
-            border-bottom: 1px solid #eee;
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+            background-color: #f8f9fa;
+            border-left: 3px solid #ddd;
         }
         .log-time {
             color: #666;
-            font-size: 0.9em;
+            font-size: 12px;
+            margin-right: 8px;
         }
         .log-error {
             color: #d32f2f;
             background-color: #ffebee;
+            border-left-color: #d32f2f;
         }
-        /* 添加思考中的动画样式 */
-        .thinking {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            padding: 10px;
-            margin-right: 20%;
-            background-color: #f5f5f5;
-            border-radius: 5px;
-        }
-        
-        .dot {
-            width: 8px;
-            height: 8px;
-            background-color: #2196f3;
-            border-radius: 50%;
-            animation: bounce 1.4s infinite ease-in-out both;
-        }
-        
-        .dot:nth-child(1) { animation-delay: -0.32s; }
-        .dot:nth-child(2) { animation-delay: -0.16s; }
-        
-        @keyframes bounce {
-            0%, 80%, 100% { transform: scale(0); }
-            40% { transform: scale(1); }
-        }
-        .task-list {
-            margin: 20px 0;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        .task-item {
-            padding: 10px;
-            margin: 5px 0;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        .task-completed {
+        .log-success {
+            color: #2e7d32;
             background-color: #e8f5e9;
+            border-left-color: #2e7d32;
         }
-        .task-pending {
+        .log-warning {
+            color: #f57c00;
             background-color: #fff3e0;
+            border-left-color: #f57c00;
         }
-        /* 添加新的样式 */
-        .browser-container {
-            height: 400px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            background-color: white;
-            display: flex;
-            flex-direction: column;
-            width: 100%;
-            box-sizing: border-box;
+        .log-info {
+            color: #1976d2;
+            background-color: #e3f2fd;
+            border-left-color: #1976d2;
         }
-        
-        .browser-header {
-            padding: 10px;
-            background-color: #f5f5f5;
-            border-bottom: 1px solid #ddd;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            width: 100%;
-            box-sizing: border-box;
+        .log-variable {
+            color: #9c27b0;
+            font-weight: bold;
         }
-        
-        .browser-content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            width: 100%;
-            box-sizing: border-box;
+        .log-json {
+            white-space: pre-wrap;
+            word-break: break-all;
         }
-        
-        /* Markdown 样式 */
-        .markdown-content {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            line-height: 1.6;
-        }
-        
-        .markdown-content h1,
-        .markdown-content h2,
-        .markdown-content h3,
-        .markdown-content h4,
-        .markdown-content h5,
-        .markdown-content h6 {
-            margin-top: 24px;
-            margin-bottom: 16px;
-            font-weight: 600;
-            line-height: 1.25;
-        }
-        
-        .markdown-content p {
-            margin-top: 0;
-            margin-bottom: 16px;
-        }
-        
-        .markdown-content code {
-            padding: 0.2em 0.4em;
-            margin: 0;
-            font-size: 85%;
-            background-color: rgba(27,31,35,0.05);
-            border-radius: 3px;
-            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-        }
-        
-        .markdown-content pre {
-            padding: 16px;
-            overflow: auto;
-            font-size: 85%;
-            line-height: 1.45;
-            background-color: #f6f8fa;
-            border-radius: 3px;
-        }
-        
-        .markdown-content blockquote {
-            padding: 0 1em;
-            color: #6a737d;
-            border-left: 0.25em solid #dfe2e5;
-            margin: 0 0 16px 0;
-        }
-        
-        .markdown-content ul,
-        .markdown-content ol {
-            padding-left: 2em;
-            margin-top: 0;
-            margin-bottom: 16px;
-        }
-        
-        .markdown-content table {
-            display: block;
-            width: 100%;
-            overflow: auto;
-            margin-top: 0;
-            margin-bottom: 16px;
-            border-spacing: 0;
-            border-collapse: collapse;
-        }
-        
-        .markdown-content table th {
-            font-weight: 600;
-        }
-        
-        .markdown-content table th,
-        .markdown-content table td {
-            padding: 6px 13px;
-            border: 1px solid #dfe2e5;
-        }
-        
-        .markdown-content table tr {
-            background-color: #fff;
-            border-top: 1px solid #c6cbd1;
-        }
-        
-        .markdown-content table tr:nth-child(2n) {
-            background-color: #f6f8fa;
-        }
-        
-        .browser-iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-            box-sizing: border-box;
-        }
-        
         .log-section {
             grid-column: 1 / -1;
             width: 100%;
             box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
-        
         .log-container {
             height: 250px;
             overflow-y: auto;
             border: 1px solid #ddd;
             border-radius: 5px;
             padding: 10px;
-            background-color: #fffbe6;
+            background-color: #fff;
             font-family: monospace;
             width: 100%;
             box-sizing: border-box;
+            margin: 0;
         }
         h1, h2 {
             color: #333;
@@ -326,12 +194,13 @@
         .chat-container {
             height: 500px;
             overflow-y: auto;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            padding: 10px;
+            border: none;
+            border-radius: 0;
+            padding: 15px;
             margin-bottom: 20px;
             width: 100%;
             box-sizing: border-box;
+            background-color: #f5f5f5;
         }
         .task-container {
             height: 250px;
@@ -349,6 +218,14 @@
             width: 100%;
             box-sizing: border-box;
         }
+        /* 添加时间戳样式 */
+        .message-time {
+            font-size: 10px;
+            color: #999;
+            text-align: center;
+            margin: 10px 0;
+            width: 100%;
+        }
         /* 优化滚动条样式 */
         ::-webkit-scrollbar {
             width: 8px;
@@ -363,6 +240,124 @@
         }
         ::-webkit-scrollbar-thumb:hover {
             background: #555;
+        }
+        .browser-container {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            background-color: #fff;
+        }
+        .result-item {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+        }
+        .result-item.success {
+            border-left: 4px solid #4caf50;
+        }
+        .result-item.error {
+            border-left: 4px solid #f44336;
+        }
+        .result-item.warning {
+            border-left: 4px solid #ff9800;
+        }
+        .result-item.info {
+            border-left: 4px solid #2196f3;
+        }
+        .result-header {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        .result-content {
+            color: #666;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        /* 添加 Markdown 内容样式 */
+        .markdown-content {
+            font-family: 'Microsoft YaHei', sans-serif;
+            line-height: 1.6;
+        }
+        .markdown-content h1,
+        .markdown-content h2,
+        .markdown-content h3,
+        .markdown-content h4,
+        .markdown-content h5,
+        .markdown-content h6 {
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+            color: #333;
+        }
+        .markdown-content p {
+            margin: 0.5em 0;
+        }
+        .markdown-content code {
+            background-color: #f5f5f5;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Consolas', monospace;
+        }
+        .markdown-content pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .markdown-content blockquote {
+            border-left: 4px solid #ddd;
+            padding-left: 1em;
+            margin-left: 0;
+            color: #666;
+        }
+        .markdown-content ul,
+        .markdown-content ol {
+            padding-left: 2em;
+        }
+        .markdown-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1em 0;
+        }
+        .markdown-content th,
+        .markdown-content td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        .markdown-content th {
+            background-color: #f5f5f5;
+        }
+        /* 添加搜索结果样式 */
+        .search-result {
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .search-result-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #1a0dab;
+            margin-bottom: 8px;
+        }
+        .search-result-link {
+            font-size: 14px;
+            color: #006621;
+            margin-bottom: 8px;
+            word-break: break-all;
+        }
+        .search-result-snippet {
+            font-size: 14px;
+            color: #545454;
+            line-height: 1.4;
+        }
+        .search-results-container {
+            margin-top: 20px;
         }
     </style>
 </head>
@@ -388,9 +383,6 @@
             
             <h2>任务结果</h2>
             <div class="browser-container">
-                <div class="browser-header">
-                    <span>任务执行结果</span>
-                </div>
                 <div class="browser-content" id="resultContent">
                     <!-- 任务结果将在这里动态添加 -->
                 </div>
@@ -417,7 +409,6 @@
     </template>
 
     <div class="task-list" id="taskList">
-        <h2>任务列表</h2>
         <div id="tasks"></div>
     </div>
 
@@ -499,14 +490,55 @@
             } catch (error) {
                 // 发生错误时也要隐藏思考状态
                 hideThinking();
-                addMessage('抱歉，发送请求时出现错误', 'assistant');
+                let errorMessage = '抱歉，发送请求时出现错误';
+                if (error) {
+                    errorMessage += ': ' + (error.message || error.toString());
+                }
+                addMessage(errorMessage, 'assistant');
             }
         }
 
         function addMessage(text, type) {
+            // 添加时间戳
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            timeDiv.textContent = new Date().toLocaleTimeString();
+            
+            // 只在非系统消息时显示时间戳，或者当前消息是系统消息且是第一条系统消息时显示
+            const lastMessage = chatContainer.lastElementChild;
+            if (type !== 'system' || !lastMessage || !lastMessage.classList.contains('system-message')) {
+                chatContainer.appendChild(timeDiv);
+            }
+
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${type}-message`;
-            messageDiv.textContent = text;
+            
+            // 处理系统消息
+            if (type === 'system') {
+                const displayText = text.length > 50 ? text.substring(0, 50) + '...' : text;
+                messageDiv.textContent = displayText;
+                if (text.length > 50) {
+                    messageDiv.title = text; // 鼠标悬停时显示完整文本
+                    messageDiv.style.cursor = 'pointer';
+                    messageDiv.onclick = function() {
+                        if (messageDiv.textContent === displayText) {
+                            messageDiv.textContent = text;
+                        } else {
+                            messageDiv.textContent = displayText;
+                        }
+                    };
+                }
+            }
+            // 处理助手消息
+            else if (type === 'assistant') {
+                const htmlContent = marked.parse(text);
+                messageDiv.innerHTML = `<div class="markdown-content">${htmlContent}</div>`;
+            }
+            // 处理用户消息
+            else {
+                messageDiv.textContent = text;
+            }
+            
             chatContainer.appendChild(messageDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
@@ -540,18 +572,53 @@
                 const logDiv = document.createElement('div');
                 logDiv.className = 'log-entry';
                 
-                // 根据日志类型添加不同的样式
-                if (typeof log === 'object' && log.status === 'error') {
-                    logDiv.className += ' log-error';
+                // 处理日志类型和样式
+                if (typeof log === 'object') {
+                    if (log.status === 'error') {
+                        logDiv.className += ' log-error';
+                    } else if (log.status === 'success') {
+                        logDiv.className += ' log-success';
+                    } else if (log.status === 'warning') {
+                        logDiv.className += ' log-warning';
+                    } else {
+                        logDiv.className += ' log-info';
+                    }
                 }
-                
-                const logContent = typeof log === 'object' ? 
-                    (log.error || log.result || JSON.stringify(log)) : log;
-                
+
+                // 处理日志内容
+                let logContent = '';
+                if (typeof log === 'object') {
+                    // 处理JSON对象
+                    if (log.error) {
+                        logContent = log.error;
+                    } else if (log.result) {
+                        try {
+                            // 尝试格式化JSON字符串
+                            const formattedJson = JSON.stringify(JSON.parse(log.result), null, 2);
+                            logContent = `<div class="log-json">${formattedJson}</div>`;
+                        } catch (e) {
+                            logContent = log.result;
+                        }
+                    } else {
+                        logContent = JSON.stringify(log, null, 2);
+                    }
+                } else {
+                    // 处理普通文本
+                    logContent = log.toString()
+                        .replace(/\n/g, ' ') // 移除换行符
+                        .replace(/\s+/g, ' '); // 合并多个空格
+                }
+
+                // 高亮变量
+                logContent = logContent.replace(/\b([A-Za-z_][A-Za-z0-9_]*)\b/g, (match) => {
+                    return `<span class="log-variable">${match}</span>`;
+                });
+
                 logDiv.innerHTML = `
                     <span class="log-time">[${new Date().toLocaleTimeString()}]</span>
                     <span>${logContent}</span>
                 `;
+                
                 logContainer.appendChild(logDiv);
                 logContainer.scrollTop = logContainer.scrollHeight;
             });
@@ -613,23 +680,89 @@
             }
         });
 
-        // 添加更新任务结果的函数
-        function updateTaskResult(content) {
+       
+
+        // 添加处理 update_result_ui 事件的函数
+        function updateResultUI(data) {
             const resultContent = document.getElementById('resultContent');
-            if (content) {
-                // 使用 marked 解析 Markdown
-                const htmlContent = marked.parse(content);
-                resultContent.innerHTML = `<div class="markdown-content">${htmlContent}</div>`;
+            resultContent.innerHTML = ''; // 清空现有内容
+            
+            if (!data.memory) {
+                return;
+            }
+
+            // 使用更宽松的正则表达式来匹配JSON数组
+            const jsonPattern = /\[\s*\{[\s\S]*?\}\s*\]/;
+            const match = data.memory.match(jsonPattern);
+            
+            if (match) {
+                try {
+                    // 处理数组形式的字符串
+                    let jsonStr = match[0];
+                    if (jsonStr.trim().startsWith('[') && jsonStr.trim().endsWith(']')) {
+                        jsonStr = `{"result": ${jsonStr}}`;
+                    }
+                    
+                    // 解析JSON
+                    const parsedData = JSON.parse(jsonStr);
+                    
+                    // 检查是否是搜索结果数组
+                    if (Array.isArray(parsedData.result) && parsedData.result.length > 0 && 
+                        parsedData.result[0].status && parsedData.result[0].result) {
+                        
+                        // 创建搜索结果容器
+                        const resultsContainer = document.createElement('div');
+                        resultsContainer.className = 'search-results-container';
+                        
+                        // 处理每个搜索结果
+                        parsedData.result.forEach(item => {
+                            if (item.status === 'success' && item.result && item.result.title) {
+                                const resultDiv = document.createElement('div');
+                                resultDiv.className = 'search-result';
+                                
+                                const titleDiv = document.createElement('div');
+                                titleDiv.className = 'search-result-title';
+                                titleDiv.textContent = item.result.title;
+                                
+                                const summaryDiv = document.createElement('div');
+                                summaryDiv.className = 'search-result-snippet';
+                                summaryDiv.textContent = item.result.summary || '';
+                                
+                                const keywordsDiv = document.createElement('div');
+                                keywordsDiv.className = 'search-result-keywords';
+                                keywordsDiv.textContent = '关键词: ' + (item.result.keywords ? item.result.keywords.join(', ') : '');
+                                
+                                resultDiv.appendChild(titleDiv);
+                                resultDiv.appendChild(summaryDiv);
+                                resultDiv.appendChild(keywordsDiv);
+                                resultsContainer.appendChild(resultDiv);
+                            }
+                        });
+                        
+                        // 将Markdown内容中的JSON部分替换为处理后的HTML
+                        const processedContent = data.memory.replace(jsonPattern, resultsContainer.outerHTML);
+                        const htmlContent = marked.parse(processedContent);
+                        resultContent.innerHTML = `<div class="markdown-content">${htmlContent}</div>`;
+                    } else {
+                        // 如果不是搜索结果数组，则使用原有的Markdown解析
+                        const htmlContent = marked.parse(data.memory);
+                        resultContent.innerHTML = `<div class="markdown-content">${htmlContent}</div>`;
+                    }
+                } catch (e) {
+                    // 如果解析失败，则使用原有的Markdown解析
+                    const htmlContent = marked.parse(data.memory);
+                    resultContent.innerHTML = `<div class="markdown-content">${htmlContent}</div>`;
+                }
             } else {
-                resultContent.innerHTML = '';
+                // 如果没有找到JSON数组，则使用原有的Markdown解析
+                const htmlContent = marked.parse(data.memory);
+                resultContent.innerHTML = `<div class="markdown-content">${htmlContent}</div>`;
             }
         }
-        
-        // 修改socket监听，添加任务结果更新
-        socket.on('update_task_result', function(data) {
-            if (data.content) {
-                updateTaskResult(data.content);
-            }
+
+        // 监听 update_result_ui 事件
+        socket.on('update_result_ui', function(data) {
+            updateResultUI(data);
         });
 
         // 初始化

@@ -7,6 +7,11 @@ import requests
 import time
 import json
 import re
+from app.tool.logger_tool import LoggerTool
+
+# 初始化日志工具
+logger_tool = LoggerTool()
+logger = logger_tool.get_logger("ReactFlow")
 
 class ReactFlow(BaseFlow):
     """反应流程类，负责执行具体任务"""
@@ -20,6 +25,7 @@ class ReactFlow(BaseFlow):
         """
         super().__init__(config)
         self.prompt_template = None
+        logger.info(f"初始化ReactFlow，配置: {config}")
         
     def initialize(self) -> Dict[str, Any]:
         """
@@ -39,39 +45,40 @@ class ReactFlow(BaseFlow):
             }
         except Exception as e:
             error_msg = f"反应流程初始化失败: {str(e)}"
-            print(error_msg)
+            logger.error(error_msg)
             return {
                 "status": "error",
                 "result": None,
                 "error": error_msg
             }
     
-    async def execute(self, task: Dict[str, Any], tools: List[Any]) -> Dict[str, Any]:
+    async def execute(self, task: Dict[str, Any], tools: List[Any], request_id: str = None) -> Dict[str, Any]:
         """
         执行任务，分为thinking和act两个步骤
         
         Args:
             task: 任务信息
             tools: 可用工具列表
+            request_id: 请求ID
             
         Returns:
             Dict[str, Any]: 执行结果
         """
         try:
-            # 打印任务信息
-            print(f"开始执行任务: {task.get('description', '未知任务')}")
+            # 记录任务信息
+            logger.info(f"[RequestID: {request_id}] 开始执行任务: {task.get('description', '未知任务')}")
             # 从task中获取上一步的结果
             previous_result = task.get("previous_result")
             if previous_result:
-                print(f"获取到上一步执行结果: {previous_result}")
+                logger.info(f"[RequestID: {request_id}] 获取到上一步执行结果: {previous_result}")
             else:
-                print("未找到上一步执行结果")
+                logger.info(f"[RequestID: {request_id}] 未找到上一步执行结果")
                 
             # 1. Thinking 步骤：分析任务并生成执行计划
-            print("开始思考步骤...")
-            thinking_result = self._thinking_step(task, tools)
+            logger.info(f"[RequestID: {request_id}] 开始思考步骤...")
+            thinking_result = self._thinking_step(task, tools, request_id)
             if thinking_result.get("status") == "error":
-                print(f"思考步骤失败: {thinking_result.get('error')}")
+                logger.error(f"[RequestID: {request_id}] 思考步骤失败: {thinking_result.get('error')}")
                 return {
                     "status": "error",
                     "error": thinking_result.get("error"),
@@ -82,13 +89,13 @@ class ReactFlow(BaseFlow):
                     }
                 }
                 
-            print(f"思考步骤完成，生成执行计划: {thinking_result.get('result')}")
+            logger.info(f"[RequestID: {request_id}] 思考步骤完成，生成执行计划: {thinking_result.get('result')}")
                 
             # 2. Act 步骤：执行具体工具
-            print("开始执行步骤...")
-            act_result = await self._act_step(thinking_result.get("result", []), tools)
+            logger.info(f"[RequestID: {request_id}] 开始执行步骤...")
+            act_result = await self._act_step(thinking_result.get("result", []), tools, request_id)
             
-            print(f"执行步骤完成，结果: {act_result.get('result')}")
+            logger.info(f"[RequestID: {request_id}] 执行步骤完成，结果: {act_result.get('result')}")
             
             # 3. 合并结果
             # 如果任何步骤执行失败，整个任务就失败
@@ -127,7 +134,7 @@ class ReactFlow(BaseFlow):
             
         except Exception as e:
             error_msg = f"执行任务失败: {str(e)}"
-            print(error_msg)
+            logger.error(f"[RequestID: {request_id}] {error_msg}")
             return {
                 "status": "error",
                 "error": error_msg,
@@ -138,13 +145,14 @@ class ReactFlow(BaseFlow):
                 }
             }
     
-    def _thinking_step(self, task: Dict[str, Any], tools: List[Any]) -> Dict[str, Any]:
+    def _thinking_step(self, task: Dict[str, Any], tools: List[Any], request_id: str = None) -> Dict[str, Any]:
         """
         Thinking 步骤：分析任务并生成执行计划
         
         Args:
             task: 任务信息
             tools: 可用工具列表
+            request_id: 请求ID
             
         Returns:
             Dict[str, Any]: 思考结果
@@ -161,7 +169,7 @@ class ReactFlow(BaseFlow):
                         "functions": tool_desc.get("functions", [])
                     })
                 except Exception as e:
-                    print(f"获取工具描述失败: {str(e)}")
+                    logger.error(f"[RequestID: {request_id}] 获取工具描述失败: {str(e)}")
                     continue
             
             # 准备上下文
@@ -170,13 +178,14 @@ class ReactFlow(BaseFlow):
                 "tools": available_tools,
                 "memory": self.memory if hasattr(self, "memory") else [],
                 "step": "thinking",
-                "debug": True  # 添加调试标志
+                "debug": True,  # 添加调试标志
+                "request_id": request_id
             }
             
             # 如果任务中包含上下文信息，添加到提示模板中
             if "context" in task:
                 context_temp["context"] = task["context"]
-                print(f"使用上下文信息: {task['context']}")
+                logger.info(f"[RequestID: {request_id}] 使用上下文信息: {task['context']}")
             
             # 渲染提示模板 - 使用**context将字典解包为关键字参数
             prompt = self.prompt_template.render(**context_temp)
@@ -207,12 +216,12 @@ class ReactFlow(BaseFlow):
                     except (SyntaxError, ValueError):
                         # 如果仍然失败，返回空列表
                         steps = []
-                        print(f"无法React任务: {content}")
+                        logger.error(f"[RequestID: {request_id}] 无法React任务: {content}")
             else:
                 # 如果content不是字符串，直接使用
                 steps = content
                 
-            print(f"解析后的步骤: {steps}")
+            logger.info(f"[RequestID: {request_id}] 解析后的步骤: {steps}")
             # 确保返回的是列表格式
             if isinstance(steps, dict):
                 # 如果steps是字典，尝试提取列表
@@ -262,7 +271,7 @@ class ReactFlow(BaseFlow):
                 
         except Exception as e:
             error_msg = f"思考步骤失败: {str(e)}"
-            print(error_msg)
+            logger.error(f"[RequestID: {request_id}] {error_msg}")
             return {
                 "status": "error",
                 "result": None,
@@ -309,17 +318,18 @@ class ReactFlow(BaseFlow):
                 return steps[:20]
             
         except Exception as e:
-            print(f"解析步骤失败: {str(e)}")
+            logger.error(f"解析步骤失败: {str(e)}")
             return []
         
 
-    async def _act_step(self, steps: List[Dict[str, Any]], tools: List[Any]) -> Dict[str, Any]:
+    async def _act_step(self, steps: List[Dict[str, Any]], tools: List[Any], request_id: str = None) -> Dict[str, Any]:
         """
         Act 步骤：执行具体工具
         
         Args:
             steps: 执行步骤列表
             tools: 可用工具列表
+            request_id: 请求ID
             
         Returns:
             Dict[str, Any]: 执行结果
@@ -332,15 +342,15 @@ class ReactFlow(BaseFlow):
             if not isinstance(steps, list):
                 steps = [steps]
             
-            print(f"准备执行 {len(steps)} 个步骤")
+            logger.info(f"[RequestID: {request_id}] 准备执行 {len(steps)} 个步骤")
             
             for i, step in enumerate(steps):
-                print(f"执行步骤 {i+1}/{len(steps)}: {step}")
+                logger.info(f"[RequestID: {request_id}] 执行步骤 {i+1}/{len(steps)}: {step}")
                 
                 # 确保 step 是字典
                 if not isinstance(step, dict):
-                    error_msg = f"步骤格式错误: {step}"
-                    print(error_msg)
+                    error_msg = f"[RequestID: {request_id}] 步骤格式错误: {step}"
+                    logger.error(error_msg)
                     results.append({
                         "status": "error",
                         "result": None,
@@ -351,8 +361,8 @@ class ReactFlow(BaseFlow):
                 # 查找对应的工具
                 tool_name = step.get("tool")
                 if not tool_name:
-                    error_msg = "步骤中缺少工具名称"
-                    print(error_msg)
+                    error_msg = "[RequestID: {request_id}] 步骤中缺少工具名称"
+                    logger.error(error_msg)
                     results.append({
                         "status": "error",
                         "result": None,
@@ -360,12 +370,12 @@ class ReactFlow(BaseFlow):
                     })
                     continue
                 
-                print(f"查找工具: {tool_name}")
+                logger.info(f"[RequestID: {request_id}] 查找工具: {tool_name}")
                 tool = self._find_tool(tool_name, tools)
                 
                 if not tool:
-                    error_msg = f"未找到工具: {tool_name}"
-                    print(error_msg)
+                    error_msg = f"[RequestID: {request_id}] 未找到工具: {tool_name}"
+                    logger.error(error_msg)
                     results.append({
                         "status": "error",
                         "result": None,
@@ -378,8 +388,8 @@ class ReactFlow(BaseFlow):
                     # 获取工具函数
                     function_name = step.get("function")
                     if not function_name:
-                        error_msg = "步骤中缺少函数名称"
-                        print(error_msg)
+                        error_msg = "[RequestID: {request_id}] 步骤中缺少函数名称"
+                        logger.error(error_msg)
                         results.append({
                             "status": "error",
                             "result": None,
@@ -388,8 +398,8 @@ class ReactFlow(BaseFlow):
                         continue
                     
                     if not hasattr(tool, function_name):
-                        error_msg = f"工具 {tool_name} 没有函数 {function_name}"
-                        print(error_msg)
+                        error_msg = f"[RequestID: {request_id}] 工具 {tool_name} 没有函数 {function_name}"
+                        logger.error(error_msg)
                         results.append({
                             "status": "error",
                             "result": None,
@@ -429,8 +439,8 @@ class ReactFlow(BaseFlow):
                         required_params = {k: v for k, v in function.__annotations__.items() 
                                         if k != 'return' and k not in params}
                         if required_params:
-                            error_msg = f"缺少必要参数: {', '.join(required_params.keys())}"
-                            print(error_msg)
+                            error_msg = f"[RequestID: {request_id}] 缺少必要参数: {', '.join(required_params.keys())}"
+                            logger.error(error_msg)
                             results.append({
                                 "status": "error",
                                 "result": None,
@@ -438,7 +448,7 @@ class ReactFlow(BaseFlow):
                             })
                             continue
                     
-                    print(f"调用函数: {tool_name}.{function_name}，参数: {params}")
+                    logger.info(f"[RequestID: {request_id}] 调用函数: {tool_name}.{function_name}，参数: {params}")
                     
                     # 调用函数
                     result = function(**params)
@@ -447,7 +457,7 @@ class ReactFlow(BaseFlow):
                     if hasattr(result, "__await__"):
                         result = await result
                     
-                    print(f"函数调用成功，结果: {result}")
+                    logger.info(f"[RequestID: {request_id}] 函数调用成功，结果: {result}")
                     
                     # 存储步骤结果
                     step_results[i + 1] = result
@@ -476,15 +486,15 @@ class ReactFlow(BaseFlow):
                     })
                     
                 except Exception as e:
-                    error_msg = f"执行工具 {tool_name}.{function_name} 失败: {str(e)}"
-                    print(error_msg)
+                    error_msg = f"[RequestID: {request_id}] 执行工具 {tool_name}.{function_name} 失败: {str(e)}"
+                    logger.error(error_msg)
                     results.append({
                         "status": "error",
                         "result": None,
                         "error": error_msg
                     })
             
-            print(f"当前act_step 步骤执行完成，结果: {results}")
+            logger.info(f"[RequestID: {request_id}] 当前act_step 步骤执行完成，结果: {results}")
             
             # 检查是否有任何步骤失败
             for result in results:
@@ -507,7 +517,7 @@ class ReactFlow(BaseFlow):
             
         except Exception as e:
             error_msg = f"执行步骤失败: {str(e)}"
-            print(error_msg)
+            logger.error(f"[RequestID: {request_id}] {error_msg}")
             return {
                 "status": "error",
                 "result": None,
@@ -547,14 +557,14 @@ class ReactFlow(BaseFlow):
         try:
             # 如果 result_str 不是字符串，直接返回
             if not isinstance(result_str, str):
-                print(f"解析步骤失败: result_str 不是字符串: {result_str}")
+                logger.error(f"解析步骤失败: result_str 不是字符串: {result_str}")
                 return []
             
             # 尝试解析JSON
             try:
                 steps = json.loads(result_str)
             except json.JSONDecodeError:
-                print(f"解析步骤失败: 无法解析JSON: {result_str}")
+                logger.error(f"解析步骤失败: 无法解析JSON: {result_str}")
                 return []
             
             # 确保是列表
@@ -581,7 +591,7 @@ class ReactFlow(BaseFlow):
             return validated_steps
             
         except Exception as e:
-            print(f"解析步骤失败: {str(e)}")
+            logger.error(f"解析步骤失败: {str(e)}")
             return []
     
     def _load_prompt_template(self) -> Template:

@@ -1,10 +1,16 @@
 from typing import Dict, Any
+from app.tool.logger_tool import LoggerTool
+
+# 初始化日志工具
+logger_tool = LoggerTool()
+logger = logger_tool.get_logger("CalculatorTool")
 
 class CalculatorTool:
     """本地计算器工具"""
     
     def __init__(self, config: Dict[str, Any]):
         self.config = config
+        logger.info(f"初始化CalculatorTool，配置: {config}")
         
     def add(self, a: float, b: float) -> Dict[str, Any]:
         """执行加法运算
@@ -22,21 +28,26 @@ class CalculatorTool:
             }
         """
         try:
+            logger.info(f"执行加法运算: {a} + {b}")
             result = float(a) + float(b)
+            logger.info(f"计算结果: {result}")
             return {
                 "status": "success",
                 "result": result,
                 "error": None
             }
         except (ValueError, TypeError) as e:
+            error_msg = f"计算错误: {str(e)}"
+            logger.error(error_msg)
             return {
                 "status": "error",
                 "result": None,
-                "error": f"计算错误: {str(e)}"
+                "error": error_msg
             }
     
     def get_tool_description(self) -> Dict[str, Any]:
-        """返回工具描述，符合MCP协议""" 
+        """返回工具描述，符合MCP协议"""
+        logger.info("获取工具描述")
         return {
             "name": "calculator",
             "description": "一个简单的计算器工具，提供基础的数学运算功能",

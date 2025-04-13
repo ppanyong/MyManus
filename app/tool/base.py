@@ -1,5 +1,10 @@
 from typing import Dict, Any
 from abc import ABC, abstractmethod
+from app.tool.logger_tool import LoggerTool
+
+# 初始化日志工具
+logger_tool = LoggerTool()
+logger = logger_tool.get_logger("BaseTool")
 
 class BaseTool(ABC):
     """工具基类"""
@@ -12,6 +17,7 @@ class BaseTool(ABC):
             config: 工具配置
         """
         self.config = config or {}
+        logger.info(f"初始化BaseTool，配置: {config}")
     
     @abstractmethod
     def get_tool_description(self) -> Dict[str, Any]:
