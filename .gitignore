@@ -43,7 +43,6 @@ app/agent/__pycache__/manus.cpython-313.pyc
 config/config.toml
 
 # Screenshots
-screenshots/
 screenshots/search/
 screenshots/search/*.jpg
 

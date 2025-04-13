@@ -6,6 +6,7 @@ from app.tool.html_parser_tool import HTMLParserTool
 from app.tool.python_execute import PythonExecuteTool
 from app.tool.google_search import GoogleSearchTool
 from app.tool.baidu_search import BaiduSearchTool
+from app.tool.baidu_image_tool import BaiduImageTool
 from app.tool.time_tool import TimeTool
 from app.ui.ui import UI
 from app.tool.calculator import CalculatorTool
@@ -41,6 +42,7 @@ def main():
     agent.add_tool(FileManager(config))
     agent.add_tool(HTMLParserTool(config))
     agent.add_tool(TimeTool(config))
+    agent.add_tool(BaiduImageTool(config))
     
     # 初始化智能体
     agent.initialize()

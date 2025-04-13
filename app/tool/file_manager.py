@@ -1,5 +1,6 @@
 import os
 from typing import Dict, Any, Optional
+import requests
 from app.tool.logger_tool import LoggerTool
 
 # 初始化日志工具
@@ -68,6 +69,20 @@ class FileManager:
                         "filename": {
                             "type": "string",
                             "description": "要删除的文件路径"
+                        }
+                    }
+                },
+                {
+                    "name": "download",
+                    "description": "下载文件",
+                    "parameters": {
+                        "url": {
+                            "type": "string",
+                            "description": "要下载的文件URL"
+                        },
+                        "save_path": {
+                            "type": "string",
+                            "description": "文件保存路径"
                         }
                     }
                 }
@@ -228,6 +243,53 @@ class FileManager:
             }
         except Exception as e:
             error_msg = f"删除文件失败: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "status": "error",
+                "error": error_msg
+            }
+    
+    def download(self, url: str, save_path: str) -> Dict[str, Any]:
+        """下载文件
+        
+        Args:
+            url: 文件URL
+            save_path: 文件保存路径
+            
+        Returns:
+            Dict[str, Any]: 操作结果
+        """
+        try:
+            full_path = self._get_full_path(save_path)
+            logger.info(f"尝试下载文件: {url} 到 {full_path}")
+            
+            # 确保目录存在
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            
+            # 下载文件
+            response = requests.get(url, stream=True)
+            response.raise_for_status()
+            
+            # 写入文件
+            with open(full_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        
+            logger.info(f"文件下载成功: {full_path}")
+            return {
+                "status": "success",
+                "message": f"文件下载成功: {full_path}"
+            }
+        except requests.exceptions.RequestException as e:
+            error_msg = f"下载文件失败: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "status": "error",
+                "error": error_msg
+            }
+        except Exception as e:
+            error_msg = f"下载文件失败: {str(e)}"
             logger.error(error_msg)
             return {
                 "status": "error",
