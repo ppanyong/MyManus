@@ -7,11 +7,10 @@
             "request": "launch",
             "program": "${workspaceFolder}/main.py",
             "console": "integratedTerminal",
-            "justMyCode": false,
-            "python": "d:\\ProgramData\\envs\\open_manus\\python.exe",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}"
-            }
+            },
+            "cwd": "${workspaceFolder}"
         }
     ]
-} 
+}

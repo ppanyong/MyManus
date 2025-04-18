@@ -214,13 +214,34 @@ class ManusAgent(ToolCallAgent):
                 self.current_task_index = i
                 logger.info(f"[RequestID: {self.current_request_id}] 开始执行第 {i+1} 个任务: {task.get('description', '未知任务')}")
                 
-                # 获取上一步的结果
-                if i > 0 and self.memory:
-                    previous_result = self.memory[-1].get("result")
-                    logger.info(f"[RequestID: {self.current_request_id}] 上一步结果: {previous_result}")
-                    if previous_result:
-                        task["previous_result"] = previous_result
-                        logger.info(f"[RequestID: {self.current_request_id}] 添加上一步结果到任务 {i+1}")
+                # 获取依赖任务的结果
+                dependencies = task.get("dependencies", [])
+                if dependencies:
+                    # 从memory中获取所有依赖任务的结果
+                    previous_results = {}  # 改为字典格式
+                    for dep in dependencies:
+                        # 解析依赖步骤ID
+                        if isinstance(dep, str) and dep.startswith("step_"):
+                            try:
+                                dep_step_id = int(dep.split("_")[1])
+                                # 查找依赖任务的结果
+                                for memory_item in self.memory:
+                                    if memory_item.get("step") == dep_step_id:
+                                        result = str(memory_item.get("result", ""))  # 使用空字符串作为默认值，并确保转换为字符串
+                                        previous_results[f"step_{dep_step_id}_result"] = result
+                                        # logger.info(f"[RequestID: {self.current_request_id}] 找到依赖步骤 {dep} 的结果")
+                                        break
+                            except (ValueError, IndexError):
+                                logger.error(f"[RequestID: {self.current_request_id}] 无法解析依赖步骤ID: {dep}")
+                        else:
+                            logger.error(f"[RequestID: {self.current_request_id}] 无效的依赖步骤格式: {dep}")
+                    
+                    if previous_results:
+                        # 将字典转换为JSON字符串
+                        previous_results_str = json.dumps(previous_results, ensure_ascii=False)
+                        # 合并所有依赖任务的结果
+                        task["previous_result"] = previous_results_str
+                        # logger.info(f"[RequestID: {self.current_request_id}] 添加依赖任务结果到任务 {i+1}: {previous_results_str}")
                 
                 # 执行任务
                 step_result = await self.react_flow.execute(task, self.tools, self.current_request_id)

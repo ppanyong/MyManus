@@ -3,11 +3,14 @@ from typing import Dict, Any, List, Optional, Tuple
 import os
 from jinja2 import Template
 from .base import BaseFlow
+from .planning import PlanningFlow
 import requests
 import time
 import json
 import re
+import inspect
 from app.tool.logger_tool import LoggerTool
+from app.tool.result_processor import ResultProcessor
 
 # 初始化日志工具
 logger_tool = LoggerTool()
@@ -25,7 +28,17 @@ class ReactFlow(BaseFlow):
         """
         super().__init__(config)
         self.prompt_template = None
+        self.planning_flow = None  # 用于访问规划流程
         logger.info(f"初始化ReactFlow，配置: {config}")
+        
+    def set_planning_flow(self, planning_flow: PlanningFlow) -> None:
+        """设置规划流程实例
+        
+        Args:
+            planning_flow: PlanningFlow实例
+        """
+        self.planning_flow = planning_flow
+        logger.info("设置规划流程实例成功")
         
     def initialize(self) -> Dict[str, Any]:
         """
@@ -67,13 +80,7 @@ class ReactFlow(BaseFlow):
         try:
             # 记录任务信息
             logger.info(f"[RequestID: {request_id}] 开始执行任务: {task.get('description', '未知任务')}")
-            # 从task中获取上一步的结果
-            previous_result = task.get("previous_result")
-            if previous_result:
-                logger.info(f"[RequestID: {request_id}] 获取到上一步执行结果: {previous_result}")
-            else:
-                logger.info(f"[RequestID: {request_id}] 未找到上一步执行结果")
-                
+            
             # 1. Thinking 步骤：分析任务并生成执行计划
             logger.info(f"[RequestID: {request_id}] 开始思考步骤...")
             thinking_result = self._thinking_step(task, tools, request_id)
@@ -171,12 +178,48 @@ class ReactFlow(BaseFlow):
                 except Exception as e:
                     logger.error(f"[RequestID: {request_id}] 获取工具描述失败: {str(e)}")
                     continue
+
+            # 对task进行结构化处理，将task中的previous_result字段转换为json格式，如果存在previous_result字段，则将previous_result字段转换为json格式，否则将task转换为json格式
+            if "previous_result" in task:
+                try:
+                    # 检查 previous_result 是否为空或无效
+                    if not task["previous_result"] or task["previous_result"].strip() == "":
+                        logger.warning(f"[RequestID: {request_id}] previous_result 为空，跳过解析")
+                        task["previous_result"] = {}
+                    else:
+                        # 如果已经是字典类型，直接使用
+                        if isinstance(task["previous_result"], dict):
+                            logger.info(f"[RequestID: {request_id}] previous_result 已经是字典类型，直接使用")
+                        else:
+                            # 尝试解析为JSON
+                            task["previous_result"] = json.loads(task["previous_result"])
+                    
+                    # 从previous_result中提取出task.parameters字段中需要的字段,并替换task.parameters字段中的值
+                    for key, value in task["parameters"].items():
+                        logger.info(f"[RequestID: {request_id}] 处理参数: {key}, {value}")
+                        value = str(value).strip("{").strip("}")
+                        logger.info(f"[RequestID: {request_id}] 处理后的参数: {value}")
+                        if value in task["previous_result"]:
+                            step_result = task["previous_result"][value]
+                            logger.info(f"[RequestID: {request_id}] 从previous_result中获取到的值: {step_result}")
+                            
+                            # 使用ResultProcessor处理结果
+                            parsed_result = ResultProcessor.parse_result(step_result, request_id)
+                            task["parameters"][key] = ResultProcessor.extract_result_value(parsed_result)
+                            logger.info(f"[RequestID: {request_id}] 替换参数: {key}, {task['parameters'][key]}")
+                except json.JSONDecodeError as e:
+                    logger.warning(f"[RequestID: {request_id}] 解析 previous_result 失败: {str(e)}，使用空字典")
+                    task["previous_result"] = {}
+           
             
             # 准备上下文
             context_temp = {
-                "task": task,
+                "task": {
+                    **task,
+                    "previous_result": task.get("previous_result")
+                },
                 "tools": available_tools,
-                "memory": self.memory if hasattr(self, "memory") else [],
+                # "memory": self.memory if hasattr(self, "memory") else [],
                 "step": "thinking",
                 "debug": True,  # 添加调试标志
                 "request_id": request_id
@@ -185,11 +228,10 @@ class ReactFlow(BaseFlow):
             # 如果任务中包含上下文信息，添加到提示模板中
             if "context" in task:
                 context_temp["context"] = task["context"]
-                logger.info(f"[RequestID: {request_id}] 使用上下文信息: {task['context']}")
-            
+            # logger.info(f"[RequestID: {request_id}] 上下文信息: {context_temp}")
             # 渲染提示模板 - 使用**context将字典解包为关键字参数
             prompt = self.prompt_template.render(**context_temp)
-            
+            logger.info(f"[RequestID: {request_id}] 渲染后的提示模板: {prompt}")
             # 调用大模型
             response = super().execute(prompt)
             
@@ -358,6 +400,24 @@ class ReactFlow(BaseFlow):
                     })
                     continue
                 
+                # 检查步骤依赖
+                step_id = step.get("step_id")
+                if step_id and self.planning_flow:
+                    dependencies = self.planning_flow.get_step_dependencies(step_id)
+                    if dependencies:
+                        # 检查所有依赖步骤是否已完成
+                        for dep_step_id in dependencies:
+                            dep_result = self.planning_flow.get_step_result(dep_step_id)
+                            if not dep_result:
+                                error_msg = f"[RequestID: {request_id}] 步骤 {step_id} 依赖的步骤 {dep_step_id} 尚未完成"
+                                logger.error(error_msg)
+                                results.append({
+                                    "status": "error",
+                                    "result": None,
+                                    "error": error_msg
+                                })
+                                continue
+                
                 # 查找对应的工具
                 tool_name = step.get("tool")
                 if not tool_name:
@@ -436,8 +496,13 @@ class ReactFlow(BaseFlow):
                     # 验证参数
                     function = getattr(tool, function_name)
                     if hasattr(function, "__annotations__"):
-                        required_params = {k: v for k, v in function.__annotations__.items() 
-                                        if k != 'return' and k not in params}
+                        # 获取函数的参数签名
+                        sig = inspect.signature(function)
+                        # 获取所有参数
+                        parameters = sig.parameters
+                        # 找出没有默认值的必要参数
+                        required_params = {k: v for k, v in parameters.items() 
+                                        if k != 'self' and v.default == inspect.Parameter.empty and k not in params}
                         if required_params:
                             error_msg = f"[RequestID: {request_id}] 缺少必要参数: {', '.join(required_params.keys())}"
                             logger.error(error_msg)
@@ -461,6 +526,10 @@ class ReactFlow(BaseFlow):
                     
                     # 存储步骤结果
                     step_results[i + 1] = result
+                    
+                    # 更新规划流程中的步骤结果
+                    if step_id and self.planning_flow:
+                        self.planning_flow.update_step_result(step_id, result)
                     
                     # 检查结果状态
                     if isinstance(result, dict):
@@ -507,7 +576,12 @@ class ReactFlow(BaseFlow):
             
             # 如果所有步骤都成功
             if len(results) == 1:
-                return results[0]
+               # return results[0]
+                return {
+                    "status": "success",
+                    "result": results[0],
+                    "error": None
+                }
             else:
                 return {
                     "status": "success",

@@ -32,9 +32,30 @@ class FileManager:
                     "name": "create_file",
                     "description": "创建一个新文件",
                     "parameters": {
+                        "path": {
+                            "type": "string",
+                            "description": "文件所在的目录路径，必须明确指定"
+                        },
                         "filename": {
                             "type": "string",
-                            "description": "要创建的文件路径"
+                            "description": "要创建的文件名"
+                        }
+                    },
+                    "returns": {
+                        "type": "object",
+                        "properties": {
+                            "status": {
+                                "type": "string",
+                                "enum": ["success", "error"]
+                            },
+                            "result": {
+                                "type": "string",
+                                "description": "操作结果描述"
+                            },
+                            "error": {
+                                "type": "string",
+                                "description": "错误信息"
+                            }
                         }
                     }
                 },
@@ -42,9 +63,30 @@ class FileManager:
                     "name": "read_file",
                     "description": "读取文件内容",
                     "parameters": {
+                        "path": {
+                            "type": "string",
+                            "description": "文件所在的目录路径，必须明确指定"
+                        },
                         "filename": {
                             "type": "string",
-                            "description": "要读取的文件路径"
+                            "description": "要读取的文件名"
+                        }
+                    },
+                    "returns": {
+                        "type": "object",
+                        "properties": {
+                            "status": {
+                                "type": "string",
+                                "enum": ["success", "error"]
+                            },
+                            "result": {
+                                "type": "string",
+                                "description": "文件内容"
+                            },
+                            "error": {
+                                "type": "string",
+                                "description": "错误信息"
+                            }
                         }
                     }
                 },
@@ -52,13 +94,34 @@ class FileManager:
                     "name": "write_file",
                     "description": "写入内容到文件",
                     "parameters": {
+                        "path": {
+                            "type": "string",
+                            "description": "文件所在的目录路径，必须明确指定"
+                        },
                         "filename": {
                             "type": "string",
-                            "description": "要写入的文件路径"
+                            "description": "要写入的文件名"
                         },
                         "content": {
                             "type": "string",
                             "description": "要写入的内容"
+                        }
+                    },
+                    "returns": {
+                        "type": "object",
+                        "properties": {
+                            "status": {
+                                "type": "string",
+                                "enum": ["success", "error"]
+                            },
+                            "result": {
+                                "type": "string",
+                                "description": "操作结果描述"
+                            },
+                            "error": {
+                                "type": "string",
+                                "description": "错误信息"
+                            }
                         }
                     }
                 },
@@ -69,6 +132,23 @@ class FileManager:
                         "filename": {
                             "type": "string",
                             "description": "要删除的文件路径"
+                        }
+                    },
+                    "returns": {
+                        "type": "object",
+                        "properties": {
+                            "status": {
+                                "type": "string",
+                                "enum": ["success", "error"]
+                            },
+                            "result": {
+                                "type": "string",
+                                "description": "操作结果描述"
+                            },
+                            "error": {
+                                "type": "string",
+                                "description": "错误信息"
+                            }
                         }
                     }
                 },
@@ -83,6 +163,50 @@ class FileManager:
                         "save_path": {
                             "type": "string",
                             "description": "文件保存路径"
+                        }
+                    },
+                    "returns": {
+                        "type": "object",
+                        "properties": {
+                            "status": {
+                                "type": "string",
+                                "enum": ["success", "error"]
+                            },
+                            "result": {
+                                "type": "string",
+                                "description": "操作结果描述"
+                            },
+                            "error": {
+                                "type": "string",
+                                "description": "错误信息"
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "create_directory",
+                    "description": "创建一个新目录",
+                    "parameters": {
+                        "directory": {
+                            "type": "string",
+                            "description": "要创建的目录路径，如果不指定则在项目根目录的temp目录下创建"
+                        }
+                    },
+                    "returns": {
+                        "type": "object",
+                        "properties": {
+                            "status": {
+                                "type": "string",
+                                "enum": ["success", "error"]
+                            },
+                            "result": {
+                                "type": "string",
+                                "description": "操作结果描述"
+                            },
+                            "error": {
+                                "type": "string",
+                                "description": "错误信息"
+                            }
                         }
                     }
                 }
@@ -102,17 +226,20 @@ class FileManager:
             return os.path.join(self.base_dir, filename)
         return filename
     
-    def create_file(self, filename: str) -> Dict[str, Any]:
+    def create_file(self, path: str, filename: str) -> Dict[str, Any]:
         """创建新文件
         
         Args:
-            filename: 文件路径
+            path: 文件所在的目录路径
+            filename: 文件名
             
         Returns:
             Dict[str, Any]: 操作结果
         """
         try:
-            full_path = self._get_full_path(filename)
+            # 组合完整路径
+            full_path = os.path.join(path, filename)
+            full_path = self._get_full_path(full_path)
             logger.info(f"尝试创建文件: {full_path}")
             
             # 检查文件是否已存在
@@ -134,7 +261,7 @@ class FileManager:
             logger.info(f"文件创建成功: {full_path}")
             return {
                 "status": "success",
-                "message": f"文件创建成功: {full_path}"
+                "result": f"文件创建成功: {full_path}"
             }
         except Exception as e:
             error_msg = f"创建文件失败: {str(e)}"
@@ -144,17 +271,19 @@ class FileManager:
                 "error": error_msg
             }
     
-    def read_file(self, filename: str) -> Dict[str, Any]:
+    def read_file(self, path: str, filename: str) -> Dict[str, Any]:
         """读取文件内容
         
         Args:
-            filename: 文件路径
+            path: 文件所在的目录路径
+            filename: 要读取的文件名
             
         Returns:
             Dict[str, Any]: 操作结果
         """
         try:
-            full_path = self._get_full_path(filename)
+            full_path = os.path.join(path, filename)
+            full_path = self._get_full_path(full_path)
             logger.info(f"尝试读取文件: {full_path}")
             
             if not os.path.exists(full_path):
@@ -171,7 +300,7 @@ class FileManager:
             logger.info(f"文件读取成功: {full_path}")
             return {
                 "status": "success",
-                "content": content
+                "result": content
             }
         except Exception as e:
             error_msg = f"读取文件失败: {str(e)}"
@@ -181,18 +310,21 @@ class FileManager:
                 "error": error_msg
             }
     
-    def write_file(self, filename: str, content: str) -> Dict[str, Any]:
+    def write_file(self, path: str, filename: str, content: str) -> Dict[str, Any]:
         """写入内容到文件
         
         Args:
-            filename: 文件路径
+            path: 文件所在的目录路径
+            filename: 文件名
             content: 要写入的内容
             
         Returns:
             Dict[str, Any]: 操作结果
         """
         try:
-            full_path = self._get_full_path(filename)
+            # 组合完整路径
+            full_path = os.path.join(path, filename)
+            full_path = self._get_full_path(full_path)
             logger.info(f"尝试写入文件: {full_path}")
             
             # 确保目录存在
@@ -204,7 +336,7 @@ class FileManager:
             logger.info(f"文件写入成功: {full_path}")
             return {
                 "status": "success",
-                "message": f"文件写入成功: {full_path}"
+                "result": f"文件写入成功: {full_path}"
             }
         except Exception as e:
             error_msg = f"写入文件失败: {str(e)}"
@@ -239,7 +371,7 @@ class FileManager:
             logger.info(f"文件删除成功: {full_path}")
             return {
                 "status": "success",
-                "message": f"文件删除成功: {full_path}"
+                "result": f"文件删除成功: {full_path}"
             }
         except Exception as e:
             error_msg = f"删除文件失败: {str(e)}"
@@ -279,7 +411,7 @@ class FileManager:
             logger.info(f"文件下载成功: {full_path}")
             return {
                 "status": "success",
-                "message": f"文件下载成功: {full_path}"
+                "result": f"文件下载成功: {full_path}"
             }
         except requests.exceptions.RequestException as e:
             error_msg = f"下载文件失败: {str(e)}"
@@ -290,6 +422,47 @@ class FileManager:
             }
         except Exception as e:
             error_msg = f"下载文件失败: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "status": "error",
+                "error": error_msg
+            }
+    
+    def create_directory(self, directory: Optional[str] = None) -> Dict[str, Any]:
+        """创建新目录
+        
+        Args:
+            directory: 目录路径，如果不指定则在项目根目录的temp目录下创建
+            
+        Returns:
+            Dict[str, Any]: 操作结果
+        """
+        try:
+            if directory is None:
+                directory = os.path.join(self.base_dir, 'temp')
+            
+            full_path = self._get_full_path(directory)
+            logger.info(f"尝试创建目录: {full_path}")
+            
+            # 检查目录是否已存在
+            if os.path.exists(full_path):
+                error_msg = f"目录已存在: {full_path}"
+                logger.warning(error_msg)
+                return {
+                    "status": "error",
+                    "error": error_msg
+                }
+            
+            # 创建目录
+            os.makedirs(full_path)
+                
+            logger.info(f"目录创建成功: {full_path}")
+            return {
+                "status": "success",
+                "result": f"目录创建成功: {full_path}"
+            }
+        except Exception as e:
+            error_msg = f"创建目录失败: {str(e)}"
             logger.error(error_msg)
             return {
                 "status": "error",

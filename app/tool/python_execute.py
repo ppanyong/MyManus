@@ -42,14 +42,14 @@ class PythonExecuteTool:
                 logger.error(error_msg)
                 return {
                     "status": "error",
-                    "output": None,
+                    "result": None,
                     "error": error_msg
                 }
             
             logger.info(f"执行成功，输出: {result.stdout}")
             return {
                 "status": "success",
-                "output": result.stdout,
+                "result": result.stdout,
                 "error": ""
             }
             
@@ -58,7 +58,7 @@ class PythonExecuteTool:
             logger.error(error_msg)
             return {
                 "status": "error",
-                "output": None,
+                "result": None,
                 "error": error_msg
             }
         except Exception as e:
@@ -66,7 +66,7 @@ class PythonExecuteTool:
             logger.error(error_msg)
             return {
                 "status": "error",
-                "output": None,
+                "result": None,
                 "error": error_msg
             }
         finally:
@@ -105,7 +105,7 @@ class PythonExecuteTool:
                                 "type": "string",
                                 "enum": ["success", "error"]
                             },
-                            "output": {
+                            "result": {
                                 "type": "string",
                                 "description": "代码执行的输出结果"
                             },

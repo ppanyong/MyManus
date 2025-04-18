@@ -17,7 +17,9 @@ from jinja2 import Environment, FileSystemLoader
 from bs4 import BeautifulSoup
 from app.tool.logger_tool import LoggerTool
 
-logger = logging.getLogger(__name__)
+# 初始化日志工具
+logger_tool = LoggerTool()
+logger = logger_tool.get_logger("HTMLParserTool")
 
 class HTMLParserTool(BaseTool):
     """HTML解析工具类"""
@@ -30,8 +32,7 @@ class HTMLParserTool(BaseTool):
         # 加载提示词模板
         self._load_prompts()
         # 初始化日志工具
-        logger_tool = LoggerTool(log_dir=os.path.join("logs", "tools"))
-        self.logger = logger_tool.get_logger(self.__class__.__name__)
+        logger.info(f"初始化HTMLParserTool，配置: {config}")
     
     def _load_prompts(self):
         """加载提示词模板"""
@@ -48,11 +49,11 @@ class HTMLParserTool(BaseTool):
         """返回工具描述，符合MCP协议"""
         return {
             "name": "html_parser",
-            "description": "HTML解析工具，可以读取URL内容并生成小结",
+            "description": "HTML解析工具，接受搜索结构的URL链接，访问链接并内容生成小结摘要，适合于search的工具配合使用。",
             "functions": [
                 {
                     "name": "parse_url",
-                    "description": "解析URL内容并生成小结",
+                    "description": "解析URL，并访问内容并生成小结",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -269,7 +270,7 @@ class HTMLParserTool(BaseTool):
         # 5. 如果还是没有内容，返回所有文本
         if not main_content:
             main_content = soup.get_text(strip=True)
-        self.logger.info(f"提取的主要内容: {main_content}")
+        logger.info(f"提取的主要内容: {main_content}")
         return main_content
     
     def _generate_summary(self, content: str, max_length: int = 200) -> str:
@@ -460,7 +461,7 @@ class HTMLParserTool(BaseTool):
         """
         try:
             # 从配置中获取 API 设置
-            api_config = self.config.get('api', {})
+            api_config = self.config.get('summary_api', {})  # 修改为使用summary_api配置
             
             if not api_config:
                 return {
@@ -489,8 +490,8 @@ class HTMLParserTool(BaseTool):
                 "prompt": prompt,
                 "stream": api_config.get('stream', False),
                 "options": {
-                    "temperature": api_config.get('temperature', 0.7),
-                    "max_tokens": api_config.get('max_tokens', 4096)
+                    "temperature": api_config.get('temperature', 0.3),  # 默认使用较低的温度
+                    "max_tokens": api_config.get('max_tokens', 2000)  # 默认使用较少的token
                 },
                 "messages": [
                     {
@@ -533,27 +534,27 @@ class HTMLParserTool(BaseTool):
             return {
                 "status": "error",
                 "error": f"执行异常: {str(e)}"
-            } 
+            }
 
     def parse(self, url):
         try:
             response = requests.get(url)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
-            self.logger.info(f"成功解析URL: {url}")
+            logger.info(f"成功解析URL: {url}")
             return soup
         except Exception as e:
-            self.logger.error(f"解析URL失败: {url}, 错误: {str(e)}")
+            logger.error(f"解析URL失败: {url}, 错误: {str(e)}")
             return None
             
     def extract_text(self, soup, selector):
         try:
             elements = soup.select(selector)
             text = [elem.get_text(strip=True) for elem in elements]
-            self.logger.info(f"成功提取文本，选择器: {selector}")
+            logger.info(f"成功提取文本，选择器: {selector}")
             return text
         except Exception as e:
-            self.logger.error(f"提取文本失败，选择器: {selector}, 错误: {str(e)}")
+            logger.error(f"提取文本失败，选择器: {selector}, 错误: {str(e)}")
             return []
             
     def extract_links(self, soup, base_url=None):
@@ -564,10 +565,10 @@ class HTMLParserTool(BaseTool):
                 if base_url and not href.startswith(('http://', 'https://')):
                     href = base_url.rstrip('/') + '/' + href.lstrip('/')
                 links.append(href)
-            self.logger.info(f"成功提取链接，数量: {len(links)}")
+            logger.info(f"成功提取链接，数量: {len(links)}")
             return links
         except Exception as e:
-            self.logger.error(f"提取链接失败，错误: {str(e)}")
+            logger.error(f"提取链接失败，错误: {str(e)}")
             return []
             
     def extract_images(self, soup, base_url=None):
@@ -579,10 +580,10 @@ class HTMLParserTool(BaseTool):
                     if base_url and not src.startswith(('http://', 'https://')):
                         src = base_url.rstrip('/') + '/' + src.lstrip('/')
                     images.append(src)
-            self.logger.info(f"成功提取图片，数量: {len(images)}")
+            logger.info(f"成功提取图片，数量: {len(images)}")
             return images
         except Exception as e:
-            self.logger.error(f"提取图片失败，错误: {str(e)}")
+            logger.error(f"提取图片失败，错误: {str(e)}")
             return []
             
     def extract_metadata(self, soup):
@@ -600,8 +601,8 @@ class HTMLParserTool(BaseTool):
                 if name and content:
                     metadata[name] = content
                     
-            self.logger.info(f"成功提取元数据: {metadata}")
+            logger.info(f"成功提取元数据: {metadata}")
             return metadata
         except Exception as e:
-            self.logger.error(f"提取元数据失败，错误: {str(e)}")
+            logger.error(f"提取元数据失败，错误: {str(e)}")
             return {} 

@@ -14,21 +14,20 @@ from app.tool.logger_tool import LoggerTool
 
 # 初始化日志工具
 logger_tool = LoggerTool()
-logger = logger_tool.get_logger("BaiduSearchTool")
+logger = logger_tool.get_logger("BingSearchTool")
 
-class BaiduSearchTool:
-    """百度搜索工具"""
+class BingSearchTool:
+    """Bing搜索工具"""
     
     def __init__(self, config: Dict[str, Any]):
         self.config = config
-        self.api_key = config.get("baidu_api_key")
-        self.search_engine_id = config.get("baidu_search_engine_id")
-        logger.info(f"初始化BaiduSearchTool，配置: {config}")
+        self.api_key = config.get("bing_api_key")
+        
         
         # 设置基础请求头
         self.base_headers = {
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
             'Accept-Encoding': 'gzip, deflate, br',
             'DNT': '1',
             'Connection': 'keep-alive',
@@ -157,7 +156,7 @@ class BaiduSearchTool:
             # 随机滚动
             for _ in range(random.randint(2, 4)):
                 await self.page.mouse.wheel(0, random.randint(100, 300))
-                await asyncio.sleep(random.uniform(0.1, 0.3))  # 减少等待时间
+                await asyncio.sleep(random.uniform(0.1, 0.3))
                 
             # 随机移动鼠标
             for _ in range(random.randint(3, 6)):
@@ -165,20 +164,35 @@ class BaiduSearchTool:
                     random.randint(100, 700),
                     random.randint(100, 600)
                 )
-                await asyncio.sleep(random.uniform(0.1, 0.2))  # 减少等待时间
+                await asyncio.sleep(random.uniform(0.1, 0.2))
         except Exception as e:
             logger.error(f"模拟人类行为时出错: {str(e)}")
             raise
         
-    async def _perform_search(self, query: str, max_results: int = 5) -> List[Dict[str, str]]:
-        """执行搜索并返回结果"""
+    async def _perform_search(self, query: str, max_results: int = 5, category: str = None) -> List[Dict[str, str]]:
+        """执行搜索并返回结果
+        
+        Args:
+            query (str): 搜索关键词
+            max_results (int, optional): 最大结果数量. 默认为 5.
+            category (str, optional): 搜索类别. 默认为 None.
+        """
         results = []
         try:
             # 确保浏览器已初始化
             await self._ensure_browser_initialized()
             
-            # 访问搜索页面
-            search_url = f"https://www.baidu.com/s?wd={urllib.parse.quote(query)}&rn={max_results}"
+            # 构建搜索URL
+            search_params = {
+                'q': query,
+                'count': max_results
+            }
+            
+            # 如果指定了类别，添加到搜索参数中
+            if category:
+                search_params['category'] = category
+                
+            search_url = f"https://www.bing.com/search?{urllib.parse.urlencode(search_params)}"
             logger.info(f"正在打开浏览器访问: {search_url}")
             try:
                 await self.page.goto(search_url)
@@ -196,7 +210,7 @@ class BaiduSearchTool:
             # 等待搜索结果加载
             logger.info("等待搜索结果加载...")
             try:
-                await self.page.wait_for_selector('.c-container', timeout=10000)  # 百度搜索结果选择器
+                await self.page.wait_for_selector('.b_algo', timeout=10000)  # Bing搜索结果选择器
             except Exception as e:
                 error_msg = str(e)
                 if "timeout" in error_msg.lower():
@@ -205,43 +219,35 @@ class BaiduSearchTool:
                     raise
             
             # 获取搜索结果
-            search_results = await self.page.query_selector_all('.c-container')
+            search_results = await self.page.query_selector_all('.b_algo')
             logger.info(f"找到 {len(search_results)} 个搜索结果")
             
             # 处理搜索结果
             for result in search_results:
                 try:
                     # 提取标题和链接
-                    title_elem = await result.query_selector('h3.c-title a')
-                    logger.info(f"提取标题和链接: {title_elem}")
+                    title_elem = await result.query_selector('h2 a')
                     if not title_elem:
                         continue
                         
                     title = await title_elem.text_content()
                     title = title.strip() if title else ""
-                    logger.info(f"提取标题: {title}")
                     link = await title_elem.get_attribute('href')
                     link = link or ""
-                    logger.info(f"提取链接: {link}")
-                    
                     
                     # 提取摘要
                     snippet = ""
-                    # 尝试多种可能的摘要选择器
-                    for selector in ['.content-right_1THTn', '.c-abstract', '.c-row', '.c-span-last']:
-                        snippet_elem = await result.query_selector(selector)
-                        if snippet_elem:
-                            snippet = await snippet_elem.text_content()
-                            snippet = snippet.strip() if snippet else ""
-                            if snippet:
-                                break
-                    logger.info(f"提取摘要: {snippet}")
+                    snippet_elem = await result.query_selector('.b_caption p')
+                    if snippet_elem:
+                        snippet = await snippet_elem.text_content()
+                        snippet = snippet.strip() if snippet else ""
+                    
                     # 添加结果
                     if title and link:
                         result_item = {
                             "title": title,
-                            "link": link,
-                            "snippet": snippet or "无摘要"
+                            "link": link
+                            # "snippet": snippet or "无摘要" 暂时移除摘要
                         }
                         
                         # 检查是否重复
@@ -253,109 +259,63 @@ class BaiduSearchTool:
                         
                         if not is_duplicate:
                             results.append(result_item)
-                            logger.info(f"添加搜索结果: {title}")
-                            
+                            if len(results) >= max_results:
+                                break
+                                
                 except Exception as e:
                     logger.error(f"处理搜索结果时出错: {str(e)}")
                     continue
-                    
-            if not results:
-                raise Exception("未找到有效的搜索结果")
-                
-            # 保存截图
-            await self._save_screenshot_from_page(query)
             
             return results
             
         except Exception as e:
-            error_msg = str(e)
-            if "timeout" in error_msg.lower():
-                raise Exception("页面加载超时")
-            elif "net::" in error_msg:
-                raise Exception("网络连接失败")
-            elif "browser" in error_msg.lower():
-                raise Exception("浏览器启动失败")
-            else:
-                raise
-        
-    async def _save_screenshot_from_page(self, query: str, max_retries: int = 3) -> None:
-        """保存页面截图"""
-        retry_count = 0
-        while retry_count < max_retries:
-            try:
-                # 生成文件名
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"{query}_{timestamp}.jpg"
-                
-                # 确保screenshots目录存在
-                screenshots_dir = os.path.join(os.getcwd(), "screenshots", "search")
-                os.makedirs(screenshots_dir, exist_ok=True)
-                
-                # 构建完整的文件路径
-                filepath = os.path.join(screenshots_dir, filename)
-                logger.info(f"准备保存截图 (尝试 {retry_count + 1}/{max_retries})...")
-                logger.info(f"当前工作目录: {os.getcwd()}")
-                logger.info(f"截图目录: {screenshots_dir}")
-                logger.info(f"完整文件路径: {filepath}")
-                
-                # 等待页面完全加载
-                await self.page.wait_for_load_state("networkidle")
-                await asyncio.sleep(1)  # 额外等待1秒确保页面渲染完成
-                
-                # 保存截图
-                await self.page.screenshot(path=filepath, full_page=True)
-                
-                # 验证文件是否创建成功
-                if os.path.exists(filepath):
-                    file_size = os.path.getsize(filepath)
-                    logger.info(f"截图保存成功: {filepath}")
-                    logger.info(f"文件大小: {file_size} 字节")
-                    
-                    if file_size < 1000:  # 如果文件太小，可能是截图失败
-                        logger.warning(f"警告：截图文件大小异常: {file_size} 字节")
-                        # 尝试使用PIL重新保存
-                        try:
-                            img = Image.open(filepath)
-                            img.save(filepath, 'JPEG', quality=90)
-                            logger.info(f"使用PIL重新保存截图")
-                            
-                            # 再次检查文件大小
-                            new_size = os.path.getsize(filepath)
-                            if new_size < 1000:
-                                raise Exception(f"重新保存后文件仍然太小: {new_size} 字节")
-                                
-                        except ImportError:
-                            logger.warning("PIL不可用，无法重新保存截图")
-                            raise
-                        except Exception as e:
-                            logger.error(f"使用PIL重新保存截图失败: {str(e)}")
-                            raise
-                    else:
-                        return  # 成功保存，退出函数
-                else:
-                    logger.warning(f"警告：截图文件未创建，文件路径不存在: {filepath}")
-                    raise Exception("截图文件未创建")
-                    
-            except Exception as e:
-                logger.error(f"保存截图失败 (尝试 {retry_count + 1}/{max_retries}): {str(e)}")
-                logger.error(f"异常类型: {type(e)}")
-                import traceback
-                logger.error(f"异常堆栈: {traceback.format_exc()}")
-                
-                retry_count += 1
-                if retry_count < max_retries:
-                    logger.info("等待后重试...")
-                    await asyncio.sleep(2)  # 等待2秒后重试
-                else:
-                    logger.error("已达到最大重试次数，放弃保存截图")
-                    raise Exception(f"保存截图失败，已重试{max_retries}次: {str(e)}")
-        
-    async def search(self, query: str, max_results: int = 5) -> Dict[str, Any]:
-        """执行百度搜索"""
-        try:
-            logger.info(f"开始执行搜索: {query}, 最大结果数: {max_results}")
-            results = await self._perform_search(query, max_results)
+            logger.error(f"执行搜索时出错: {str(e)}")
+            raise
             
+    async def _save_screenshot_from_page(self, query: str, max_retries: int = 3) -> None:
+        """保存搜索结果页面截图"""
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"bing_search_{query}_{timestamp}.png"
+            filepath = os.path.join(self.screenshot_dir, filename)
+            
+            for attempt in range(max_retries):
+                try:
+                    await self.page.screenshot(path=filepath, full_page=True)
+                    logger.info(f"截图已保存: {filepath}")
+                    return
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"截图失败，重试中... ({attempt + 1}/{max_retries})")
+                        await asyncio.sleep(1)
+                    else:
+                        raise
+        except Exception as e:
+            logger.error(f"保存截图时出错: {str(e)}")
+            raise
+            
+    async def search(self, query: str, max_results: int = 5, category: str = None) -> Dict[str, Any]:
+        """执行搜索并返回结果
+        
+        Args:
+            query (str): 搜索关键词
+            max_results (int, optional): 最大结果数量. 默认为 5.
+            category (str, optional): 搜索类别. 默认为 None.
+            
+        Returns:
+            Dict[str, Any]: 包含搜索结果的字典，格式为:
+                {
+                    "status": "success" | "error",
+                    "results": List[Dict[str, str]],  # 搜索结果列表
+                    "error": str | None  # 错误信息
+                }
+        """
+        try:
+            if not query:
+                raise ValueError("必须提供query参数")
+            
+            # 执行搜索
+            results = await self._perform_search(query, max_results, category)
             if not results:
                 logger.info("未找到搜索结果")
                 return {
@@ -365,6 +325,11 @@ class BaiduSearchTool:
                 }
             
             logger.info(f"搜索成功，找到 {len(results)} 个结果")
+            
+            # 保存截图
+            # await self._save_screenshot_from_page(search_query)
+            
+            # 返回结果
             return {
                 "status": "success",
                 "results": results,
@@ -378,7 +343,6 @@ class BaiduSearchTool:
                 "results": [],
                 "error": str(e)
             }
-            
         finally:
             # 清理资源
             logger.info("清理浏览器资源...")
@@ -415,8 +379,8 @@ class BaiduSearchTool:
                 self.browser = None
                 self.context = None
                 self.page = None
-                
-    def _get_random_fingerprint(self):
+            
+    def _get_random_fingerprint(self) -> Dict[str, Any]:
         """生成随机浏览器指纹"""
         return {
             "webgl_vendor": random.choice(self.browser_fingerprints["webgl_vendor"]),
@@ -426,30 +390,31 @@ class BaiduSearchTool:
             "device_memory": random.choice(self.browser_fingerprints["device_memory"]),
             "touch_points": random.choice(self.browser_fingerprints["touch_points"])
         }
-    
+        
     def get_tool_description(self) -> Dict[str, Any]:
-        """返回工具描述，符合MCP协议"""
+        """获取工具描述"""
         return {
-            "name": "baidu_search",
-            "description": "百度搜索工具,可以执行网络搜索并返回结果,必须要指定max_results 最大搜索结果数量，默认是5",
+            "name": "BingSearchTool",
+            "description": "使用Bing搜索引擎进行网页搜索的工具",
             "functions": [
                 {
                     "name": "search",
-                    "description": "执行百度搜索查询",
+                    "description": "执行Bing搜索并返回结果",
                     "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "query": {
-                                "type": "string",
-                                "description": "搜索关键词"
-                            },
-                            "max_results": {
-                                "type": "integer",
-                                "description": "最大返回结果数量",
-                                "default": 5
-                            }
+                        "query": {
+                            "type": "string",
+                            "description": "搜索关键词"
                         },
-                        "required": ["query", "max_results"]
+                        "max_results": {
+                            "type": "integer",
+                            "description": "最大结果数量",
+                            "default": 5
+                        },
+                        "category": {
+                            "type": "string",
+                            "description": "搜索类别",
+                            "default": None
+                        }
                     },
                     "returns": {
                         "type": "object",

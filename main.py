@@ -1,13 +1,19 @@
 import os
 import toml
 from app.agent.manus import ManusAgent
+from app.tool.bing_search import BingSearchTool
+from app.tool.content_summary_tool import ContentSummaryTool
 from app.tool.file_manager import FileManager
 from app.tool.html_parser_tool import HTMLParserTool
+from app.tool.markdown_to_html import MarkdownToHtmlTool
 from app.tool.python_execute import PythonExecuteTool
 from app.tool.google_search import GoogleSearchTool
 from app.tool.baidu_search import BaiduSearchTool
 from app.tool.baidu_image_tool import BaiduImageTool
 from app.tool.time_tool import TimeTool
+from app.tool.travel_budget_calculator import TravelBudgetCalculator
+from app.tool.weather_fetcher import WeatherFetcher
+from app.tool.geocoder_tool import Geocoder
 from app.ui.ui import UI
 from app.tool.calculator import CalculatorTool
 from app.tool.logger_tool import LoggerTool
@@ -37,13 +43,19 @@ def main():
     logger.info(f"初始化主智能体: {agent}")
     # 添加工具
     agent.add_tool(CalculatorTool(config))  # 先添加计算器工具
-    agent.add_tool(PythonExecuteTool(config))
-    agent.add_tool(BaiduSearchTool(config))
+    # agent.add_tool(PythonExecuteTool(config))
+    # agent.add_tool(BaiduSearchTool(config))
     agent.add_tool(FileManager(config))
-    agent.add_tool(HTMLParserTool(config))
     agent.add_tool(TimeTool(config))
-    agent.add_tool(BaiduImageTool(config))
-    
+    # agent.add_tool(BaiduImageTool(config))
+    agent.add_tool(BingSearchTool(config))
+    agent.add_tool(HTMLParserTool(config))
+    agent.add_tool(ContentSummaryTool(config))
+    agent.add_tool(MarkdownToHtmlTool(config))
+    agent.add_tool(TravelBudgetCalculator(config))
+    agent.add_tool(WeatherFetcher(config))
+    agent.add_tool(Geocoder(config))
+   
     # 初始化智能体
     agent.initialize()
     

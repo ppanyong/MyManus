@@ -14,33 +14,25 @@
 
 请分析以下任务，并确定需要执行的步骤。每个步骤应该包含使用的工具名称、函数名称和必要的参数
 
-上一步任务结果： {% if task %}{{task.previous_result}}{% endif %} ,如果有上一步任务结果，那么上一步任务结果是最重要的任务参数。
+
 任务描述：{% if task %}{{task.description}}{% endif %}
 任务目标：{% if task %}{{task.purpose}}{% endif %}
-任务参数:{% if task %}{% if task.previous_result %}{{task.previous_result}}{% else %}{{task.parameters}}{% endif %}{% endif %}
+任务参数:
+{% if task %}{% if task.previous_result %}
+任务前置依赖返回的结果： {{task.previous_result}}
+以上结果是该任务重要的参数输入，可以填充到该任务自身的参数中，作为入参。
+{% endif %}{% endif %}
+{% if task %}{% if task.parameters %}该任务自身的参数格式为：{{task.parameters}}{% endif %}{% endif %}
 
-{% set memory_info = "" %}
-{% if memory %}
-{% set memory_info = "历史记忆:\n" %}
-{% for item in memory %}
-{% set memory_info = memory_info + "- " + item + "\n" %}
-{% endfor %}
-{% endif %}
+注意：自身的参数格式中出现类似 step_1_result 的字符是占位符，具体 step_1_result 的值可以在上面"任务前置依赖返回的结果"中查询到，请在调用函数时进行替换。
 
-历史记忆：{% if memory %}
-{% for item in memory %}
-{{item}}
-{% endfor %}
-{% endif %}
-
-{% set thinking_prompt = "请分析任务，并确定需要执行的步骤。每个步骤应该包含使用的工具名称、函数名称和必要的参数。\n\n" + "\n" + tools_info + "\n" + memory_info + "\n\n请以JSON格式返回执行步骤列表，格式如下：\n" %}
-{% raw %}
+请分析任务，并确定需要执行的步骤。每个步骤应该包含使用的工具名称、函数名称和必要的参数。工具名称和函数名称一定是英文字符，不会是中文描述。请以JSON格式返回执行步骤列表，格式如下:
 ```json
 {
     "steps":[
     {
-            "tool": "工具名称:例如calculator",
-            "function": "函数名称：例如add",
+            "tool": "calculator",
+            "function": "add",
             "parameters": {
                 "参数1": "值1",
                 "参数2": "值2"
@@ -50,29 +42,9 @@
     ...
 ]}
 ```
-{% endraw %}
 
-{% set act_prompt = "请根据步骤执行任务，并返回执行结果。\n\n"  + "\n\n执行步骤：\n" + step + "\n\n请以JSON格式返回执行结果，格式如下：\n" %}
-{% raw %}
-```json
-{
-      "status": "success",
-      "results": [
-            {
-                      "step": 1,
-                       "tool": "工具名称",
-                        "result": "执行结果"
-            },
-            ...
-            ]
-}
-```
-{% endraw %}
-
-{% if step == "thinking" %}
-{{ thinking_prompt }}
-{% elif step == "act" %}
-{{ act_prompt }}
-{% else %}
-{{ thinking_prompt }}
-{% endif %} 
+注意：
+1. 在未指明时间的时候，默认采用当前系统时间作为参数。
+2. 仅仅再可用的工具和方法中做出选择，禁止使用未知工具和方法。
+3. 如果没有适合工具，可以优先采用搜索方式查询并返回结果。
+4. 上述任务列表一定是顺序执行，每一步的返回结果会传递给下一步步骤，最后的步骤负责 小结整体任务运行结果。
