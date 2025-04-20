@@ -155,7 +155,7 @@ class ContentSummaryTool(BaseTool):
                 "stream": api_config.get('stream', False),
                 "options": {
                     "temperature": api_config.get('temperature', 0.3),
-                    "max_tokens": api_config.get('max_tokens', 2000)
+                    "max_tokens": api_config.get('max_tokens', 4000)
                 },
                 "messages": [
                     {

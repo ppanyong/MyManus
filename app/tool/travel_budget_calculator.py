@@ -16,8 +16,8 @@ class TravelBudgetCalculator:
         """计算每日旅行预算
         
         Args:
-            total_budget_min: 总预算最小值
-            total_budget_max: 总预算最大值
+            total_budget_min: 总预算最小值，可以是数字或数学运算表达式
+            total_budget_max: 总预算最大值，可以是数字或数学运算表达式
             days: 旅行天数
             currency: 货币单位，默认为"元"
             
@@ -35,15 +35,36 @@ class TravelBudgetCalculator:
         try:
             logger.info(f"计算旅行预算: 总预算范围 {currency}{total_budget_min}-{currency}{total_budget_max}, {days}天")
             
+            # 处理数学运算表达式
+            def evaluate_expression(expr):
+                if isinstance(expr, dict) and 'operation' in expr and 'operands' in expr:
+                    operation = expr['operation']
+                    operands = expr['operands']
+                    if operation == 'multiply':
+                        return operands[0] * operands[1]
+                    elif operation == 'add':
+                        return operands[0] + operands[1]
+                    elif operation == 'subtract':
+                        return operands[0] - operands[1]
+                    elif operation == 'divide':
+                        return operands[0] / operands[1]
+                    else:
+                        raise ValueError(f"不支持的运算操作: {operation}")
+                return expr
+            
+            # 计算实际预算值
+            actual_min = evaluate_expression(total_budget_min)
+            actual_max = evaluate_expression(total_budget_max)
+            
             if days <= 0:
                 raise ValueError("旅行天数必须大于0")
-            if total_budget_min <= 0 or total_budget_max <= 0:
+            if actual_min <= 0 or actual_max <= 0:
                 raise ValueError("预算金额必须大于0")
-            if total_budget_min > total_budget_max:
+            if actual_min > actual_max:
                 raise ValueError("预算最小值不能大于最大值")
                 
-            daily_budget_min = total_budget_min / days
-            daily_budget_max = total_budget_max / days
+            daily_budget_min = actual_min / days
+            daily_budget_max = actual_max / days
             
             logger.info(f"计算结果: 每日预算范围 {currency}{daily_budget_min:.2f}-{currency}{daily_budget_max:.2f}")
             

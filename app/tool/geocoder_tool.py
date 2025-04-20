@@ -94,15 +94,24 @@ class Geocoder:
         conn.commit()
         conn.close()
 
-    def geocode(self, location_names: List[str]) -> Dict[str, Tuple[float, float]]:
+    def geocode(self, location_names: List[str] = None, addresses: List[str] = None) -> Dict[str, Tuple[float, float]]:
         """
         将地点名称转换为经纬度坐标
         :param location_names: 地点名称列表
+        :param addresses: 地址列表（与 location_names 参数二选一）
         :return: 地点名称与经纬度字典
         """
+        # 确定使用哪个参数
+        if location_names is None and addresses is None:
+            raise ValueError("必须提供 location_names 或 addresses 参数")
+        if location_names is not None and addresses is not None:
+            raise ValueError("不能同时提供 location_names 和 addresses 参数")
+            
+        # 使用提供的参数
+        locations = location_names if location_names is not None else addresses
         results = {}
         
-        for location in location_names:
+        for location in locations:
             try:
                 # 首先检查缓存
                 cached_result = self._get_from_cache(location)

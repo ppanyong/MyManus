@@ -57,12 +57,12 @@ class HTMLParserTool(BaseTool):
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "url": {
+                            "link": {
                                 "type": "string",
                                 "description": "要解析的URL地址"
                             }
                         },
-                        "required": ["url"]
+                        "required": ["link"]
                     },
                     "returns": {
                         "type": "object",
@@ -85,12 +85,12 @@ class HTMLParserTool(BaseTool):
             ]
         }
     
-    async def parse_url(self, url: str) -> Dict[str, Any]:
+    async def parse_url(self, link: str) -> Dict[str, Any]:
         """
         解析URL内容并生成小结
         
         Args:
-            url: 要解析的URL地址
+            link: 要解析的URL地址
             
         Returns:
             包含解析结果的字典
@@ -142,7 +142,7 @@ class HTMLParserTool(BaseTool):
                         
                         try:
                             # 访问页面
-                            await page.goto(url, wait_until='networkidle')
+                            await page.goto(link, wait_until='networkidle')
                             
                             # 模拟人类行为：随机滚动页面
                             for _ in range(random.randint(2, 5)):

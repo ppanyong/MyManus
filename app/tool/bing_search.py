@@ -294,13 +294,14 @@ class BingSearchTool:
             logger.error(f"保存截图时出错: {str(e)}")
             raise
             
-    async def search(self, query: str, max_results: int = 5, category: str = None) -> Dict[str, Any]:
+    async def search(self, query: str, max_results: int = 5, category: str = None, region: str = None) -> Dict[str, Any]:
         """执行搜索并返回结果
         
         Args:
             query (str): 搜索关键词
             max_results (int, optional): 最大结果数量. 默认为 5.
             category (str, optional): 搜索类别. 默认为 None.
+            region (str, optional): 搜索区域. 默认为 None.
             
         Returns:
             Dict[str, Any]: 包含搜索结果的字典，格式为:
@@ -413,6 +414,11 @@ class BingSearchTool:
                         "category": {
                             "type": "string",
                             "description": "搜索类别",
+                            "default": None
+                        },
+                        "region": {
+                            "type": "string",
+                            "description": "搜索区域",
                             "default": None
                         }
                     },

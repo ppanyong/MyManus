@@ -284,19 +284,27 @@ class WeatherFetcher:
                     
         raise Exception("获取天气数据失败，已达到最大重试次数")
         
-    def get_weather_report(self, locations: List[Union[str, Dict[str, Any]]], date_range: Tuple[str, str]) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    def get_weather_report(self, locations: List[Union[str, Dict[str, Any]]], date_range: Union[Tuple[str, str], Dict[str, str]]) -> Dict[str, Dict[str, Dict[str, Any]]]:
         """获取指定地点在日期范围内的天气报告
         
         Args:
             locations: 地点列表，可以是字符串列表或包含name和coordinates的字典列表
-            date_range: 日期范围 [开始日期, 结束日期]
+            date_range: 日期范围 [开始日期, 结束日期] 或 {'date': 'YYYY-MM-DD', 'time': 'HH:MM:SS', 'datetime': 'YYYY-MM-DD HH:MM:SS'}
             
         Returns:
             包含天气数据的字典
         """
         result = {}
-        start_date = datetime.strptime(date_range[0], "%Y-%m-%d")
-        end_date = datetime.strptime(date_range[1], "%Y-%m-%d")
+        
+        # 处理不同的日期格式
+        if isinstance(date_range, dict):
+            # 从datetime中提取日期部分
+            date_str = date_range['datetime'].split()[0]
+            start_date = datetime.strptime(date_str, "%Y-%m-%d")
+            end_date = start_date  # 只查询指定日期
+        else:
+            start_date = datetime.strptime(date_range[0], "%Y-%m-%d")
+            end_date = datetime.strptime(date_range[1], "%Y-%m-%d")
         
         for location in locations:
             # 处理两种输入格式
@@ -428,7 +436,7 @@ class WeatherFetcher:
                 },
                 {
                     "name": "generate_weather_summary",
-                    "description": "生成天气简报markdown文本",
+                    "description": "小结天气数据，并生成天气简报markdown文本",
                     "parameters": {
                         "weather_data": {
                             "type": "object",
@@ -444,7 +452,7 @@ class WeatherFetcher:
                             },
                             "result": {
                                 "type": "string",
-                                "description": "天气简报markdown文本"
+                                "description": "天气小结markdown文本"
                             },
                             "error": {
                                 "type": "string",

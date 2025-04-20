@@ -53,19 +53,47 @@ class ResultProcessor:
             Dict[str, Any]: 解析后的结果字典
         """
         try:
-            # 如果结果已经是字典类型，直接返回
+            # 如果已经是字典类型，直接返回
             if isinstance(result, dict):
                 return result
                 
             # 如果是字符串，尝试解析为JSON
             if isinstance(result, str):
-                normalized_str = ResultProcessor.normalize_json_string(result)
+                # 尝试直接解析
                 try:
-                    return json.loads(normalized_str)
+                    return json.loads(result)
                 except json.JSONDecodeError:
-                    logger.warning(f"[RequestID: {request_id}] 无法解析JSON字符串: {result}")
-                    return {"result": result}
+                    # 如果直接解析失败，尝试标准化后解析
+                    normalized_str = ResultProcessor.normalize_json_string(result)
+                    try:
+                        return json.loads(normalized_str)
+                    except json.JSONDecodeError:
+                        # 如果还是失败，尝试提取可能的JSON部分
+                        match = re.search(r'\{.*\}', normalized_str)
+                        if match:
+                            try:
+                                return json.loads(match.group())
+                            except json.JSONDecodeError:
+                                pass
+                        logger.warning(f"[RequestID: {request_id}] 无法解析JSON字符串: {result}")
+                        return {"result": result}
                     
+            # 如果是列表，处理每个元素
+            if isinstance(result, list):
+                processed_results = []
+                for item in result:
+                    if isinstance(item, dict):
+                        processed_results.append(item)
+                    elif isinstance(item, str):
+                        try:
+                            processed_item = json.loads(item)
+                            processed_results.append(processed_item)
+                        except json.JSONDecodeError:
+                            processed_results.append({"result": item})
+                    else:
+                        processed_results.append({"result": item})
+                return {"results": processed_results}
+                
             # 其他类型，直接包装为字典
             return {"result": result}
             
@@ -86,6 +114,20 @@ class ResultProcessor:
         """
         if not isinstance(result, dict):
             return result
+            
+        # 如果是标准响应格式（包含 status, result, error）
+        if all(k in result for k in ["status", "result", "error"]):
+            if result["status"] == "success":
+                return result["result"]
+            else:
+                return result
+                
+        # 如果有 results 键且是列表
+        if "results" in result and isinstance(result["results"], list):
+            # 如果列表只有一个元素，返回该元素
+            if len(result["results"]) == 1:
+                return result["results"][0]
+            return result["results"]
             
         # 优先返回指定键的值
         if key in result:

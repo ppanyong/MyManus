@@ -196,17 +196,19 @@ class ReactFlow(BaseFlow):
                     
                     # 从previous_result中提取出task.parameters字段中需要的字段,并替换task.parameters字段中的值
                     for key, value in task["parameters"].items():
-                        logger.info(f"[RequestID: {request_id}] 处理参数: {key}, {value}")
-                        value = str(value).strip("{").strip("}")
-                        logger.info(f"[RequestID: {request_id}] 处理后的参数: {value}")
-                        if value in task["previous_result"]:
-                            step_result = task["previous_result"][value]
-                            logger.info(f"[RequestID: {request_id}] 从previous_result中获取到的值: {step_result}")
+                        logger.info(f"[RequestID: {request_id}] thinking_step 处理参数: {key}, {value}")
+                        
+                        # 处理字符串类型的参数值
+                        if isinstance(value, str):
+                            # 处理 step_X_result.result.key 格式的引用
+                            if value.startswith('step_') and '.result.' in value:
+                                # 将 step_X_result.result.key 格式转换为 {step_X_result.result.key} 格式
+                                value = f"{{{value}}}"
                             
-                            # 使用ResultProcessor处理结果
-                            parsed_result = ResultProcessor.parse_result(step_result, request_id)
-                            task["parameters"][key] = ResultProcessor.extract_result_value(parsed_result)
-                            logger.info(f"[RequestID: {request_id}] 替换参数: {key}, {task['parameters'][key]}")
+                            # 使用 _process_step_reference 处理所有类型的引用
+                            processed_value = self._process_step_reference(value, task["previous_result"], request_id)
+                            task["parameters"][key] = processed_value
+                            logger.info(f"[RequestID: {request_id}] thinking_step 替换参数: {key}, {processed_value}")
                 except json.JSONDecodeError as e:
                     logger.warning(f"[RequestID: {request_id}] 解析 previous_result 失败: {str(e)}，使用空字典")
                     task["previous_result"] = {}
@@ -244,6 +246,18 @@ class ReactFlow(BaseFlow):
             # 初始化步骤结果字典
             step_results = {}
             
+            # 将前置依赖任务的结果合并到step_results中
+            if task.get("previous_result"):
+                try:
+                    if isinstance(task["previous_result"], str):
+                        previous_result = json.loads(task["previous_result"])
+                    else:
+                        previous_result = task["previous_result"]
+                    step_results.update(previous_result)
+                    logger.info(f"[RequestID: {request_id}] 合并前置依赖任务结果到step_results: {step_results}")
+                except Exception as e:
+                    logger.error(f"[RequestID: {request_id}] 解析前置依赖任务结果失败: {str(e)}")
+            
             # 如果content是字符串，尝试解析为JSON
             if isinstance(content, str):
                 try:
@@ -251,7 +265,6 @@ class ReactFlow(BaseFlow):
                     steps = json.loads(content)
                 except json.JSONDecodeError:
                 # 如果解析失败，尝试使用更宽松的方式
-
                     try:
                         # 使用 ast.literal_eval 解析 Python 字面量
                         steps = ast.literal_eval(content)
@@ -263,7 +276,10 @@ class ReactFlow(BaseFlow):
                 # 如果content不是字符串，直接使用
                 steps = content
                 
-            logger.info(f"[RequestID: {request_id}] 解析后的步骤: {steps}")
+            logger.info(f"[RequestID: {request_id}] 大模型直出的解析后的步骤: {steps}")
+            # 如果 steps 为空或[] 则logger.warning
+            if not steps or steps == []:
+                logger.warning(f"[RequestID: {request_id}] 大模型直出的解析后的步骤为空或[]")   
             # 确保返回的是列表格式
             if isinstance(steps, dict):
                 # 如果steps是字典，尝试提取列表
@@ -285,26 +301,29 @@ class ReactFlow(BaseFlow):
                     if not isinstance(step["parameters"], dict):
                         step["parameters"] = {}
                     # 处理参数中的步骤结果引用
+                    logger.info(f"[RequestID: {request_id}] thinking_step 开始处理参数: {step['parameters']}")
                     for key, value in step["parameters"].items():
-                        if isinstance(value, str) and value.startswith("{step_") and value.endswith("}"):
-                            step_num = int(value[6:-1].split("_")[0])
-                            if step_num in step_results:
-                                # 获取步骤结果
-                                step_result = step_results[step_num]
-                                # 如果结果是字典且包含results字段，则使用results字段的值
-                                if isinstance(step_result, dict):
-                                    if "results" in step_result and step_result["results"]:
-                                        # 如果是搜索结果，直接使用整个结果列表
-                                        step["parameters"][key] = step_result["results"]
-                                    elif "result" in step_result:
-                                        step["parameters"][key] = step_result["result"]
-                                    else:
-                                        step["parameters"][key] = step_result
+                        logger.info(f"[RequestID: {request_id}] thinking_step 处理参数 {key}: {value}")
+                        
+                        # 处理列表类型的参数值
+                        if isinstance(value, list):
+                            new_values = []
+                            for item in value:
+                                if isinstance(item, str) and "{" in item and "}" in item:
+                                    processed_item = self._process_step_reference(item, step_results, request_id)
+                                    new_values.append(processed_item)
                                 else:
-                                    step["parameters"][key] = step_result
-                            else:
-                                # 如果步骤结果不存在，保留原始值
-                                step["parameters"][key] = value
+                                    new_values.append(item)
+                            step["parameters"][key] = new_values
+                            logger.info(f"[RequestID: {request_id}] 处理后的列表参数 {key}: {new_values}")
+                            continue
+                            
+                        # 处理字符串类型的参数值
+                        if isinstance(value, str) and "{" in value and "}" in value:
+                            step["parameters"][key] = self._process_step_reference(value, step_results, request_id)
+                            logger.info(f"[RequestID: {request_id}] 处理后的参数 {key}: {step['parameters'][key]}")
+                            
+                    logger.info(f"[RequestID: {request_id}] 参数处理完成: {step['parameters']}")
 
             return {
                 "status": "success",
@@ -385,6 +404,13 @@ class ReactFlow(BaseFlow):
                 steps = [steps]
             
             logger.info(f"[RequestID: {request_id}] 准备执行 {len(steps)} 个步骤")
+            
+            # 从 planning_flow 中获取之前步骤的结果
+            if self.planning_flow:
+                for step_id, result in self.planning_flow.step_results.items():
+                    step_key = f"step_{step_id}_result"
+                    step_results[step_key] = result
+                    logger.info(f"[RequestID: {request_id}] 从规划流程中获取步骤 {step_id} 的结果: {result}")
             
             for i, step in enumerate(steps):
                 logger.info(f"[RequestID: {request_id}] 执行步骤 {i+1}/{len(steps)}: {step}")
@@ -471,27 +497,22 @@ class ReactFlow(BaseFlow):
                     params = step.get("parameters", {})
                     if not isinstance(params, dict):
                         params = {}
-                    
+                    logger.info(f"[RequestID: {request_id}] 获取函数参数: {params}")
+                    logger.info(f"[RequestID: {request_id}] 获取step_results: {step_results}")
+                    # 获取函数参数: {'date_str': 'step_1_result.datetime'}
+                    #  获取函数参数: {'locations': ['南京'], 'date_range': ["step_1_result + '-05-01'", "step_1_result + '-05-03'"]}
                     # 处理参数中的步骤结果引用
                     for key, value in params.items():
-                        if isinstance(value, str) and value.startswith("{step_") and value.endswith("}"):
-                            step_num = int(value[6:-1].split("_")[0])
-                            if step_num in step_results:
-                                # 获取步骤结果
-                                step_result = step_results[step_num]
-                                # 如果结果是字典且包含results字段，则使用results字段的值
-                                if isinstance(step_result, dict):
-                                    if "results" in step_result and step_result["results"]:
-                                        params[key] = str(step_result["results"][0].get("title", ""))
-                                    elif "result" in step_result:
-                                        params[key] = str(step_result["result"])
-                                    else:
-                                        params[key] = str(step_result)
-                                else:
-                                    params[key] = str(step_result)
-                            else:
-                                # 如果步骤结果不存在，保留原始值
-                                params[key] = value
+                        if isinstance(value, str):
+                            # 处理 step_X_result.result.key 格式的引用
+                            if value.startswith('step_') and '.result.' in value:
+                                # 将 step_X_result.result.key 格式转换为 {step_X_result.result.key} 格式
+                                value = f"{{{value}}}"
+                            
+                            # 使用 _process_step_reference 处理所有类型的引用
+                            processed_value = self._process_step_reference(value, step_results, request_id)
+                            params[key] = processed_value
+                            logger.info(f"[RequestID: {request_id}] 替换参数 {key} 为 {processed_value}")
                     
                     # 验证参数
                     function = getattr(tool, function_name)
@@ -514,7 +535,8 @@ class ReactFlow(BaseFlow):
                             continue
                     
                     logger.info(f"[RequestID: {request_id}] 调用函数: {tool_name}.{function_name}，参数: {params}")
-                    
+                    # 调用函数: time_tool.extract_year_from_date，参数: {'date_str': 'step_1_result.result.datetime'}
+                    # 调用函数: weather_fetcher.get_weather_report，参数: {'locations': ['南京'], 'date_range': ["step_1_result + '-05-01'", "step_1_result + '-05-03'"]}
                     # 调用函数
                     result = function(**params)
                     
@@ -524,12 +546,14 @@ class ReactFlow(BaseFlow):
                     
                     logger.info(f"[RequestID: {request_id}] 函数调用成功，结果: {result}")
                     
-                    # 存储步骤结果
-                    step_results[i + 1] = result
+                    # 存储步骤结果，使用step_i_result作为键
+                    step_key = f"step_{i+1}_result"
+                    step_results[step_key] = result
                     
                     # 更新规划流程中的步骤结果
                     if step_id and self.planning_flow:
                         self.planning_flow.update_step_result(step_id, result)
+                        logger.info(f"[RequestID: {request_id}] 更新规划流程中的步骤结果: {step_id}，结果: {result}")
                     
                     # 检查结果状态
                     if isinstance(result, dict):
@@ -574,20 +598,16 @@ class ReactFlow(BaseFlow):
                         "error": result.get("error")
                     }
             
-            # 如果所有步骤都成功
-            if len(results) == 1:
-               # return results[0]
-                return {
-                    "status": "success",
-                    "result": results[0],
-                    "error": None
-                }
-            else:
-                return {
-                    "status": "success",
-                    "result": results,
-                    "error": None
-                }
+            # 获取最后一步的结果
+            last_result = results[-1] if results else None
+            logger.info(f"[RequestID: {request_id}] 所有步骤执行完成，最后一步的结果: {last_result}")
+            
+            # 返回最后一步的结果
+            return {
+                "status": "success",
+                "result": last_result.get("result") if last_result else None,
+                "error": None
+            }
             
         except Exception as e:
             error_msg = f"执行步骤失败: {str(e)}"
@@ -678,4 +698,141 @@ class ReactFlow(BaseFlow):
         template_path = os.path.join(os.path.dirname(__file__), '..', '..', 'prompt', 'react.jinja')
         with open(template_path, 'r', encoding='utf-8') as f:
             return Template(f.read())
+    
+    def _process_step_reference(self, value: str, step_results: Dict, request_id: str) -> str:
+        """
+        处理步骤引用
+        
+        Args:
+            value: 包含步骤引用的字符串
+            step_results: 步骤结果字典
+            request_id: 请求ID
+            
+        Returns:
+            str: 处理后的字符串
+        """
+        logger.info(f"[RequestID: {request_id}] 开始处理步骤引用: {value}")
+        logger.info(f"[RequestID: {request_id}] 步骤结果字典: {step_results}")
+        
+        def get_nested_value(obj, path):
+            """获取嵌套值的辅助函数"""
+            try:
+                if not path:
+                    return obj
+                
+                current = obj
+                for key in path:
+                    if isinstance(current, dict):
+                        if '[' in key:
+                            # 处理数组索引
+                            base_key, index = key.split('[')
+                            index = int(index.rstrip(']'))
+                            temp = current.get(base_key)
+                            if isinstance(temp, list) and 0 <= index < len(temp):
+                                current = temp[index]
+                            else:
+                                return None
+                        else:
+                            current = current.get(key)
+                    elif isinstance(current, list):
+                        try:
+                            index = int(key)
+                            if 0 <= index < len(current):
+                                current = current[index]
+                            else:
+                                return None
+                        except ValueError:
+                            return None
+                    else:
+                        return None
+                        
+                    if current is None:
+                        return None
+                        
+                return current
+            except Exception as e:
+                logger.info(f"[RequestID: {request_id}] 获取嵌套值失败: {str(e)}")
+                return None
+        
+        def parse_step_result(step_result):
+            """解析步骤结果"""
+            if isinstance(step_result, str):
+                try:
+                    # 尝试直接解析 JSON
+                    return json.loads(step_result)
+                except json.JSONDecodeError:
+                    try:
+                        # 如果失败，尝试使用 ast.literal_eval 解析 Python 字面量
+                        return ast.literal_eval(step_result)
+                    except (SyntaxError, ValueError):
+                        # 如果还是失败，检查是否是纯文本内容
+                        if len(step_result) > 100 or '\n' in step_result or ' ' in step_result:
+                            # 如果是长文本或包含换行符，直接返回原始文本
+                            return step_result
+                        else:
+                            logger.error(f"[RequestID: {request_id}] 无法解析步骤结果: {step_result}")
+                            return None
+            return step_result
+        
+        # 查找所有步骤引用
+        import re
+        pattern = r'\{([^}]+)\}'
+        matches = re.finditer(pattern, value)
+        
+        result = value
+        for match in matches:
+            ref_content = match.group(1)
+            ref_value = None
+            
+            # 解析步骤号和路径
+            if '[' in ref_content:  # 方括号格式
+                step_key = ref_content.split('[')[0]
+                if step_key in step_results:
+                    step_result = parse_step_result(step_results[step_key])
+                    if step_result is None:
+                        continue
+                    
+                    # 解析数组索引和属性路径
+                    parts = ref_content.split('.')
+                    if len(parts) > 1:
+                        # 处理数组索引
+                        array_part = parts[0]
+                        if '[' in array_part:
+                            step_key, index = array_part.split('[')
+                            index = int(index.rstrip(']'))
+                            if isinstance(step_result, list) and 0 <= index < len(step_result):
+                                current = step_result[index]
+                                # 处理后续的属性路径
+                                for part in parts[1:]:
+                                    if isinstance(current, dict):
+                                        current = current.get(part)
+                                    else:
+                                        current = None
+                                        break
+                                ref_value = current
+            else:  # 点号格式
+                parts = ref_content.split('.')
+                if parts and parts[0].startswith('step_'):
+                    step_key = parts[0]
+                    if step_key in step_results:
+                        step_result = parse_step_result(step_results[step_key])
+                        if step_result is None:
+                            continue
+                        
+                        # 处理嵌套的字典结构
+                        current = step_result
+                        for part in parts[1:]:
+                            if isinstance(current, dict):
+                                current = current.get(part)
+                            else:
+                                current = None
+                                break
+                        ref_value = current
+            
+            if ref_value is not None:
+                # 替换引用
+                result = result.replace(match.group(0), str(ref_value))
+        
+        logger.info(f"[RequestID: {request_id}] 处理后的值: {result}")
+        return result
     
